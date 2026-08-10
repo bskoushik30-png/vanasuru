@@ -1,0 +1,187 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * VANASURU design system — luxury nature retreat.
+ * Palette: deep forest #173F35, sage #8FA58A, ivory #F6F1E8,
+ * sand #E8DFD0, gold #B8904A, charcoal #242424.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-forest: var(--forest);
+  --color-forest-deep: var(--forest-deep);
+  --color-sage: var(--sage);
+  --color-ivory: var(--ivory);
+  --color-sand: var(--sand);
+  --color-gold: var(--gold);
+  --color-terracotta: var(--terracotta);
+  --color-charcoal: var(--charcoal);
+  --font-serif: "Playfair Display", "Cormorant Garamond", Georgia, serif;
+  --font-sans: "Manrope", "Inter", system-ui, sans-serif;
+}
+
+:root {
+  --radius: 0.25rem;
+
+  /* Brand palette matched to user color swatch image */
+  --sage: #b0c0b0;        /* Swatch 1: Soft Eucalyptus Sage */
+  --ivory: #f3efe6;       /* Swatch 2: Warm Sand Ivory */
+  --forest: #1f3323;      /* Swatch 3: Deep Pine Forest Green */
+  --forest-deep: #142217; /* Swatch 3 Deep Shadow: Rich Dark Obsidian Forest */
+  --terracotta: #b67758;  /* Swatch 4: Earthy Clay Terracotta / Copper */
+  --gold: #b67758;        /* Mapped accent color to Earthy Terracotta Copper */
+  --charcoal: #111512;    /* Swatch 5: Obsidian Charcoal Black */
+  --sand: #e5dec9;        /* Warm Natural Sand */
+
+  /* Shadcn semantic tokens mapped to new brand palette */
+  --background: #f3efe6;
+  --foreground: #111512;
+  --card: #f9f6ee;
+  --card-foreground: #111512;
+  --popover: #f9f6ee;
+  --popover-foreground: #111512;
+  --primary: #1f3323;
+  --primary-foreground: #f3efe6;
+  --secondary: #e5dec9;
+  --secondary-foreground: #1f3323;
+  --muted: #e8e2d2;
+  --muted-foreground: #5c5549;
+  --accent: #b67758;
+  --accent-foreground: #f3efe6;
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: #f3efe6;
+  --border: #d8ceb7;
+  --input: #d8ceb7;
+  --ring: #b67758;
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: #142217;
+  --sidebar-foreground: #f3efe6;
+  --sidebar-primary: #b67758;
+  --sidebar-primary-foreground: #142217;
+  --sidebar-accent: #1f3323;
+  --sidebar-accent-foreground: #f3efe6;
+  --sidebar-border: #293f2f;
+  --sidebar-ring: #b67758;
+}
+
+.dark {
+  --background: #142217;
+  --foreground: #f3efe6;
+  --card: #1f3323;
+  --card-foreground: #f3efe6;
+  --popover: #1f3323;
+  --popover-foreground: #f3efe6;
+  --primary: #b67758;
+  --primary-foreground: #142217;
+  --secondary: #293f2f;
+  --secondary-foreground: #f3efe6;
+  --muted: #293f2f;
+  --muted-foreground: #c9c0ac;
+  --accent: #b67758;
+  --accent-foreground: #142217;
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: #f3efe6;
+  --border: rgba(243, 239, 230, 0.15);
+  --input: rgba(243, 239, 230, 0.2);
+  --ring: #b67758;
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: #142217;
+  --sidebar-foreground: #f3efe6;
+  --sidebar-primary: #b67758;
+  --sidebar-primary-foreground: #142217;
+  --sidebar-accent: #1f3323;
+  --sidebar-accent-foreground: #f3efe6;
+  --sidebar-border: rgba(243, 239, 230, 0.15);
+  --sidebar-ring: #b67758;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "ss02";
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-serif {
+    font-family: var(--font-serif);
+    letter-spacing: -0.01em;
+  }
+}
+
+@utility gold-divider {
+  display: inline-block;
+  width: 3rem;
+  height: 1px;
+  background: var(--gold);
+  vertical-align: middle;
+}
+
+@utility text-eyebrow {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
