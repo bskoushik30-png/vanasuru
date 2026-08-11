@@ -4058,8 +4058,8 @@ function LocationsManager({
 
             {/* Paste Embed Address / Google Maps Embed HTML */}
             <div className="sm:col-span-2 border-t border-border/40 pt-4 mt-2">
-              <label className="block text-[10px] uppercase tracking-widest font-semibold text-[color:var(--forest)] mb-1.5">
-                ðŸ“ Paste Embedded Address / Google Maps Embed Code
+              <label className="block text-[10px] uppercase tracking-widest font-semibold text-[color:var(--forest)] mb-1.5 flex items-center gap-1.5">
+                <MapPin size={12} className="text-[color:var(--gold)]" /> Paste Embedded Address / Google Maps Embed Code
               </label>
               <textarea
                 rows={3}
@@ -4086,8 +4086,8 @@ function LocationsManager({
 
             {/* Photos for Location */}
             <div className="sm:col-span-2 border-t border-border/40 pt-4 mt-2">
-              <label className="block text-[10px] uppercase tracking-widest font-semibold text-[color:var(--forest)] mb-1.5">
-                ðŸ“· Location Photos
+              <label className="block text-[10px] uppercase tracking-widest font-semibold text-[color:var(--forest)] mb-1.5 flex items-center gap-1.5">
+                <Camera size={12} className="text-[color:var(--gold)]" /> Location Photos
               </label>
               <div className="flex flex-col sm:flex-row gap-3 items-center">
                 <input

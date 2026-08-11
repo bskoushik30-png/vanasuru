@@ -266,7 +266,7 @@ function CreateEventPage() {
                 <label className="block">
                   <div className="text-[10px] tracking-[0.28em] uppercase text-charcoal/70 font-semibold mb-2 flex items-center gap-1.5">
                     <DollarSign size={12} className="text-[color:var(--gold)]" /> Rental / Entry
-                    Price (â‚¹)
+                    Price (₹)
                   </div>
                   <input
                     type="number"

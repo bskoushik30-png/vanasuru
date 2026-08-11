@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, Quote, MapPin } from "lucide-react";
+import { ArrowRight, Quote, MapPin, Calendar } from "lucide-react";
 import { SiteShell } from "@/components/site/SiteShell";
 import { PageHero } from "@/components/site/PageHero";
 import { BookingSearchCard } from "@/components/site/BookingSearchCard";
@@ -204,7 +204,7 @@ function Index() {
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                       <div className="absolute top-4 left-4 bg-[color:var(--gold)] text-[color:var(--forest-deep)] text-[9px] font-bold tracking-widest uppercase px-3 py-1 shadow-sm">
-                        {evt.property.toUpperCase()} â€¢ {evt.venue}
+                        {evt.property.toUpperCase()} • {evt.venue}
                       </div>
                     </div>
                     <div className="p-6">
@@ -215,9 +215,12 @@ function Index() {
                         {evt.description}
                       </p>
                       <div className="mt-4 flex items-center justify-between text-xs text-charcoal/60 border-t border-border/40 pt-3">
-                        <span>ðŸ“… {evt.date}</span>
-                        <span className="font-semibold text-[color:var(--forest)]">
-                          â‚¹{evt.price.toLocaleString("en-IN")}
+                        <span className="flex items-center gap-1.5">
+                          <Calendar size={13} className="text-[color:var(--gold)]" />
+                          {evt.date}
+                        </span>
+                        <span className="font-semibold text-[color:var(--forest)] font-mono">
+                          ₹{evt.price.toLocaleString("en-IN")}
                         </span>
                       </div>
                     </div>
