@@ -190,7 +190,7 @@ function EventsPage() {
                     )}
                     <div className="absolute bottom-4 left-4 right-4 text-ivory">
                       <div className="text-[10px] tracking-widest uppercase text-[color:var(--gold)] font-semibold">
-                        {evt.property.toUpperCase()} â€¢ {evt.venue}
+                        {evt.property.toUpperCase()} • {evt.venue}
                       </div>
                       <h3 className="font-serif text-xl font-bold mt-0.5 leading-tight">
                         {evt.title}

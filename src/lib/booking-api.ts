@@ -855,3 +855,13 @@ export const uploadImageToProjectDb = createServerFn({ method: "POST" })
     }
   });
 
+export const deleteEventBookingDb = createServerFn({ method: "POST" })
+  .validator(z.object({ id: z.string() }))
+  .handler(async ({ data }) => {
+    const { error } = await supabase.from("event_bookings").delete().eq("id", data.id);
+    if (error) {
+      console.warn("Supabase delete event booking note:", error.message);
+    }
+    return { success: true };
+  });
+

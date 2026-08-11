@@ -10,6 +10,7 @@ import {
   updateRoomAdvanceDb,
   syncBookingDb,
   deleteBookingDb,
+  deleteEventBookingDb,
   deleteAllBookingsDb,
 } from "./booking-api";
 import {
@@ -321,53 +322,7 @@ export async function saveStoredGalleryItems(items: GalleryItem[]): Promise<void
   }
 }
 
-const DEFAULT_EVENTS: ResortEvent[] = [
-  {
-    id: "evt-1",
-    title: "Royal Heritage Wedding Gala",
-    description:
-      "Grand wedding celebrations on our manicured heritage lawns with full banquet catering and floral decor.",
-    property: "mysore",
-    venue: "Heritage Gardens & Lawns",
-    date: "2026-11-15",
-    capacity: 350,
-    price: 150000,
-    image:
-      "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=75",
-    isHighlighted: true,
-    createdAt: "2026-07-31T08:00:00Z",
-  },
-  {
-    id: "evt-2",
-    title: "Monsoon Sunset Symphony & Dinner",
-    description:
-      "An exclusive acoustic music evening paired with fine farm-to-table dining under the stars.",
-    property: "mysore",
-    venue: "Courtyard & Dining Pavilion",
-    date: "2026-09-20",
-    capacity: 120,
-    price: 3500,
-    image:
-      "https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=1200&q=75",
-    isHighlighted: true,
-    createdAt: "2026-07-31T08:00:00Z",
-  },
-  {
-    id: "evt-3",
-    title: "Executive Leadership Summit 2026",
-    description:
-      "A corporate retreat for executive teams featuring state-of-the-art conference facilities and wellness breaks.",
-    property: "mahadevapura",
-    venue: "Grand Ballroom & Conference Suite",
-    date: "2026-10-05",
-    capacity: 200,
-    price: 85000,
-    image:
-      "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=75",
-    isHighlighted: true,
-    createdAt: "2026-07-31T08:00:00Z",
-  },
-];
+const DEFAULT_EVENTS: ResortEvent[] = [];
 
 type Listener = () => void;
 
@@ -570,12 +525,15 @@ class Store {
     const storedEvents = localStorage.getItem("vanasuru_events");
     if (storedEvents) {
       try {
-        this.events = JSON.parse(storedEvents) as ResortEvent[];
+        const loadedEvts = JSON.parse(storedEvents) as ResortEvent[];
+        this.events = loadedEvts.filter(
+          (e) => e.id !== "evt-1" && e.id !== "evt-2" && e.id !== "evt-3",
+        );
       } catch {
-        this.events = [...DEFAULT_EVENTS];
+        this.events = [];
       }
     } else {
-      this.events = [...DEFAULT_EVENTS];
+      this.events = [];
     }
 
     // Load event bookings
@@ -907,6 +865,9 @@ class Store {
     if (this.eventBookings.length !== initLen) {
       this.save();
       this.notify();
+      void deleteEventBookingDb({ data: { id } }).catch((err) => {
+        console.warn("Failed to delete event booking from Supabase DB:", err);
+      });
       return true;
     }
     return false;
