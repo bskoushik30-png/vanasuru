@@ -15,6 +15,11 @@ import {
 } from "@/lib/booking-store";
 import { PROPERTIES, ROOMS } from "@/lib/site-data";
 import { uploadImageToProjectDb } from "@/lib/booking-api";
+import {
+  sendBookingConfirmationEmail,
+  sendCheckInEmail,
+  sendCheckOutEmail,
+} from "@/lib/email-api";
 import { SiteShell } from "@/components/site/SiteShell";
 import { SectionHeading } from "@/components/site/SectionHeading";
 import { BillInvoiceModal } from "@/components/site/BillInvoiceModal";
@@ -277,6 +282,670 @@ function EventTimelineRow({
 }
 
 // ---------------------------------------------------------------------------
+// REPORTS & ANALYTICS MANAGEMENT COMPONENT
+// ---------------------------------------------------------------------------
+function ReportsManagement({
+  bookings,
+  eventBookings,
+  locations,
+  onViewBill,
+}: {
+  bookings: Booking[];
+  eventBookings: EventBooking[];
+  locations: Location[];
+  onViewBill: (b: Booking | EventBooking) => void;
+}) {
+  const [selectedMonth, setSelectedMonth] = useState<string>("all");
+  const [selectedProperty, setSelectedProperty] = useState<string>("all");
+  const [selectedType, setSelectedType] = useState<"all" | "room" | "event">("all");
+  const [reportSearch, setReportSearch] = useState<string>("");
+
+  const allDateStrings = [
+    ...bookings.map((b) => (b.createdAt ? b.createdAt.substring(0, 7) : new Date().toISOString().substring(0, 7))),
+    ...eventBookings.map((eb) => (eb.createdAt ? eb.createdAt.substring(0, 7) : new Date().toISOString().substring(0, 7))),
+  ];
+  const uniqueMonths = Array.from(new Set(allDateStrings)).sort().reverse();
+
+  const formatMonthLabel = (ym: string) => {
+    try {
+      const [year, month] = ym.split("-");
+      const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
+      return format(date, "MMMM yyyy");
+    } catch {
+      return ym;
+    }
+  };
+
+  const filteredRoomBookings = bookings.filter((b) => {
+    if (selectedType === "event") return false;
+    const m = b.createdAt ? b.createdAt.substring(0, 7) : new Date().toISOString().substring(0, 7);
+    const matchMonth = selectedMonth === "all" || m === selectedMonth;
+    const matchProp = selectedProperty === "all" || b.property === selectedProperty;
+    const matchSearch =
+      !reportSearch.trim() ||
+      b.id.toLowerCase().includes(reportSearch.toLowerCase()) ||
+      b.userName.toLowerCase().includes(reportSearch.toLowerCase()) ||
+      b.userEmail.toLowerCase().includes(reportSearch.toLowerCase());
+    return matchMonth && matchProp && matchSearch;
+  });
+
+  const filteredEventBookings = eventBookings.filter((eb) => {
+    if (selectedType === "room") return false;
+    const m = eb.createdAt ? eb.createdAt.substring(0, 7) : new Date().toISOString().substring(0, 7);
+    const matchMonth = selectedMonth === "all" || m === selectedMonth;
+    const matchProp = selectedProperty === "all" || eb.property === selectedProperty;
+    const matchSearch =
+      !reportSearch.trim() ||
+      eb.id.toLowerCase().includes(reportSearch.toLowerCase()) ||
+      eb.userName.toLowerCase().includes(reportSearch.toLowerCase()) ||
+      eb.userEmail.toLowerCase().includes(reportSearch.toLowerCase()) ||
+      eb.eventTitle.toLowerCase().includes(reportSearch.toLowerCase());
+    return matchMonth && matchProp && matchSearch;
+  });
+
+  let roomGrossTotal = 0;
+  let roomPaidTotal = 0;
+  let roomCheckinCount = 0;
+  let roomCompletedCount = 0;
+
+  filteredRoomBookings.forEach((b) => {
+    const extraChargesSum = (b.extraCharges || []).reduce((acc, c) => acc + c.amount, 0);
+    const calculatedBase = (b.pricePerNight || 3500) * (b.totalNights || 1) * (b.roomsCount || 1);
+    const grandTotal =
+      b.customGrandTotal !== undefined && b.customGrandTotal !== null
+        ? b.customGrandTotal + extraChargesSum
+        : calculatedBase + extraChargesSum;
+
+    let initialAdv = typeof b.payment?.amountPaid === "number" ? b.payment.amountPaid : 0;
+    if (b.payment?.provider === "razorpay" && initialAdv >= 100) {
+      initialAdv = Math.round(initialAdv / 100);
+    } else if (initialAdv > 5000) {
+      initialAdv = Math.round(initialAdv / 100);
+    }
+    const partials = (b.paymentsHistory || []).reduce((acc, p) => acc + p.amount, 0);
+    const paid = initialAdv + partials;
+
+    if (b.status !== "cancelled") {
+      roomGrossTotal += grandTotal;
+      roomPaidTotal += paid;
+    }
+    if (b.status === "checked_in" || b.status === "checked_out") {
+      roomCheckinCount += 1;
+    }
+    if (b.status === "checked_out") {
+      roomCompletedCount += 1;
+    }
+  });
+
+  let eventGrossTotal = 0;
+  let eventPaidTotal = 0;
+  let eventCheckinCount = 0;
+  let eventCompletedCount = 0;
+
+  filteredEventBookings.forEach((eb) => {
+    const extraChargesSum = (eb.extraCharges || []).reduce((acc, c) => acc + c.amount, 0);
+    const baseTotal = eb.totalAmount || 50000;
+    const grandTotal =
+      eb.customGrandTotal !== undefined && eb.customGrandTotal !== null
+        ? eb.customGrandTotal + extraChargesSum
+        : baseTotal + extraChargesSum;
+
+    const initialAdv = eb.advanceAmount || 0;
+    const partials = (eb.paymentsHistory || []).reduce((acc, p) => acc + p.amount, 0);
+    const paid = initialAdv + partials;
+
+    if (eb.status !== "cancelled") {
+      eventGrossTotal += grandTotal;
+      eventPaidTotal += paid;
+    }
+    if (eb.status === "checked_in" || eb.status === "checked_out") {
+      eventCheckinCount += 1;
+    }
+    if (eb.status === "checked_out") {
+      eventCompletedCount += 1;
+    }
+  });
+
+  const totalGrossRevenue = roomGrossTotal + eventGrossTotal;
+  const totalPaidCollected = roomPaidTotal + eventPaidTotal;
+  const totalBalanceDue = Math.max(0, totalGrossRevenue - totalPaidCollected);
+
+  const totalBookingsCount = filteredRoomBookings.length + filteredEventBookings.length;
+  const totalCheckinsCount = roomCheckinCount + eventCheckinCount;
+  const totalCompletedCount = roomCompletedCount + eventCompletedCount;
+
+  const handleExportCSV = () => {
+    const headers = [
+      "Booking ID",
+      "Type",
+      "Client Name",
+      "Email",
+      "Phone",
+      "Property",
+      "Room / Venue Details",
+      "Check-In / Event Date",
+      "Check-Out Date",
+      "Status",
+      "Grand Total (INR)",
+      "Advance Paid (INR)",
+      "Balance Due (INR)",
+      "Created Date",
+    ];
+
+    const dataRows: string[][] = [];
+
+    filteredRoomBookings.forEach((b) => {
+      const extraChargesSum = (b.extraCharges || []).reduce((acc, c) => acc + c.amount, 0);
+      const calculatedBase = (b.pricePerNight || 3500) * (b.totalNights || 1) * (b.roomsCount || 1);
+      const grandTotal =
+        b.customGrandTotal !== undefined && b.customGrandTotal !== null
+          ? b.customGrandTotal + extraChargesSum
+          : calculatedBase + extraChargesSum;
+
+      let initialAdv = typeof b.payment?.amountPaid === "number" ? b.payment.amountPaid : 0;
+      if (b.payment?.provider === "razorpay" && initialAdv >= 100) {
+        initialAdv = Math.round(initialAdv / 100);
+      } else if (initialAdv > 5000) {
+        initialAdv = Math.round(initialAdv / 100);
+      }
+      const partials = (b.paymentsHistory || []).reduce((acc, p) => acc + p.amount, 0);
+      const paid = initialAdv + partials;
+      const due = Math.max(0, grandTotal - paid);
+
+      dataRows.push([
+        b.id,
+        "Room Stay",
+        `"${b.userName}"`,
+        b.userEmail,
+        b.guestDetails?.mobile ? `="${b.guestDetails.mobile}"` : "N/A",
+        b.property || "mysore",
+        `"${b.roomTypeSlug} (Room ${b.roomId || "Assigned"})"`,
+        b.checkIn,
+        b.checkOut,
+        b.status,
+        grandTotal.toString(),
+        paid.toString(),
+        due.toString(),
+        b.createdAt || "",
+      ]);
+    });
+
+    filteredEventBookings.forEach((eb) => {
+      const extraChargesSum = (eb.extraCharges || []).reduce((acc, c) => acc + c.amount, 0);
+      const baseTotal = eb.totalAmount || 50000;
+      const grandTotal =
+        eb.customGrandTotal !== undefined && eb.customGrandTotal !== null
+          ? eb.customGrandTotal + extraChargesSum
+          : baseTotal + extraChargesSum;
+
+      const initialAdv = eb.advanceAmount || 0;
+      const partials = (eb.paymentsHistory || []).reduce((acc, p) => acc + p.amount, 0);
+      const paid = initialAdv + partials;
+      const due = Math.max(0, grandTotal - paid);
+
+      dataRows.push([
+        eb.id,
+        "Event Banquet",
+        `"${eb.userName}"`,
+        eb.userEmail,
+        eb.guestDetails?.mobile ? `="${eb.guestDetails.mobile}"` : "N/A",
+        eb.property || "mysore",
+        `"${eb.eventTitle} (${eb.venue})"`,
+        eb.eventDate,
+        "N/A",
+        eb.status,
+        grandTotal.toString(),
+        paid.toString(),
+        due.toString(),
+        eb.createdAt || "",
+      ]);
+    });
+
+    const csvStr =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...dataRows.map((r) => r.join(","))].join("\n");
+
+    const encoded = encodeURI(csvStr);
+    const link = document.createElement("a");
+    link.setAttribute("href", encoded);
+    const monthTag = selectedMonth === "all" ? "Lifetime" : selectedMonth;
+    link.setAttribute("download", `VANASURU_Monthly_Financial_Report_${monthTag}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <div className="space-y-8 animate-fade-in">
+      {/* Header & Controls Bar */}
+      <div className="bg-card border border-border/60 shadow-lg p-6 md:p-8 space-y-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border/40 pb-6">
+          <div>
+            <div className="text-[10px] uppercase font-bold tracking-widest text-[color:var(--gold)] flex items-center gap-1.5">
+              <TrendingUp size={14} /> Revenue &amp; Operational Analytics
+            </div>
+            <h3 className="font-serif text-2xl text-[color:var(--forest)] mt-1">
+              Resort Financial Reports &amp; Statements
+            </h3>
+            <p className="text-xs text-charcoal/60 mt-0.5">
+              Track revenue, total bookings, check-ins, completed stays, and export monthly statements.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              className="inline-flex items-center gap-2 bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-semibold uppercase tracking-wider px-4 py-2.5 rounded transition-colors cursor-pointer shadow-sm"
+              title="Download detailed monthly spreadsheet in CSV format"
+            >
+              <FileText size={15} /> Download Monthly CSV Report
+            </button>
+
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-2 bg-[color:var(--forest)] hover:bg-[color:var(--gold)] hover:text-black text-ivory text-xs font-semibold uppercase tracking-wider px-4 py-2.5 rounded transition-colors cursor-pointer shadow-sm"
+              title="Print or Save PDF Financial Statement"
+            >
+              <FileText size={15} /> Print Report Statement
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Dropdowns & Search Bar */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-[10px] uppercase font-bold tracking-wider text-charcoal/60 mb-1">
+              Select Month &amp; Year
+            </label>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="w-full bg-transparent border border-border px-3 py-2 text-xs focus:border-[color:var(--gold)] focus:outline-none rounded font-medium"
+            >
+              <option value="all">All Time (Lifetime Summary)</option>
+              {uniqueMonths.map((m) => (
+                <option key={m} value={m}>
+                  {formatMonthLabel(m)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[10px] uppercase font-bold tracking-wider text-charcoal/60 mb-1">
+              Resort Location
+            </label>
+            <select
+              value={selectedProperty}
+              onChange={(e) => setSelectedProperty(e.target.value)}
+              className="w-full bg-transparent border border-border px-3 py-2 text-xs focus:border-[color:var(--gold)] focus:outline-none rounded font-medium"
+            >
+              <option value="all">All Properties</option>
+              {locations.map((loc) => (
+                <option key={loc.key} value={loc.key}>
+                  {loc.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[10px] uppercase font-bold tracking-wider text-charcoal/60 mb-1">
+              Booking Type
+            </label>
+            <select
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value as any)}
+              className="w-full bg-transparent border border-border px-3 py-2 text-xs focus:border-[color:var(--gold)] focus:outline-none rounded font-medium"
+            >
+              <option value="all">All Bookings (Rooms &amp; Events)</option>
+              <option value="room">Room Stays Only</option>
+              <option value="event">Event Banquets Only</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[10px] uppercase font-bold tracking-wider text-charcoal/60 mb-1">
+              Search Client / ID
+            </label>
+            <input
+              type="text"
+              placeholder="Search Name, Email, ID..."
+              value={reportSearch}
+              onChange={(e) => setReportSearch(e.target.value)}
+              className="w-full bg-transparent border border-border px-3 py-2 text-xs focus:border-[color:var(--gold)] focus:outline-none rounded"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Primary KPI Metrics Grid */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="bg-card border border-border/60 p-5 rounded-lg shadow-sm space-y-2">
+          <div className="flex justify-between items-center text-charcoal/60 text-xs font-semibold uppercase tracking-wider">
+            <span>Total Gross Revenue</span>
+            <IndianRupee size={16} className="text-gold-dark" />
+          </div>
+          <div className="font-mono text-3xl font-bold text-[color:var(--forest)]">
+            ₹{totalGrossRevenue.toLocaleString("en-IN")}
+          </div>
+          <p className="text-[11px] text-charcoal/60">
+            Combined total amount for {selectedMonth === "all" ? "Lifetime" : formatMonthLabel(selectedMonth)}
+          </p>
+        </div>
+
+        <div className="bg-card border border-border/60 p-5 rounded-lg shadow-sm space-y-2">
+          <div className="flex justify-between items-center text-charcoal/60 text-xs font-semibold uppercase tracking-wider">
+            <span>Total Bookings</span>
+            <Calendar size={16} className="text-gold-dark" />
+          </div>
+          <div className="font-mono text-3xl font-bold text-charcoal">
+            {totalBookingsCount}
+          </div>
+          <p className="text-[11px] text-charcoal/60">
+            {filteredRoomBookings.length} Room Stays + {filteredEventBookings.length} Event Banquets
+          </p>
+        </div>
+
+        <div className="bg-card border border-border/60 p-5 rounded-lg shadow-sm space-y-2">
+          <div className="flex justify-between items-center text-charcoal/60 text-xs font-semibold uppercase tracking-wider">
+            <span>Total Check-Ins</span>
+            <LogIn size={16} className="text-emerald-700" />
+          </div>
+          <div className="font-mono text-3xl font-bold text-emerald-800">
+            {totalCheckinsCount}
+          </div>
+          <p className="text-[11px] text-charcoal/60">
+            Guests checked-in or completed check-out
+          </p>
+        </div>
+
+        <div className="bg-card border border-border/60 p-5 rounded-lg shadow-sm space-y-2">
+          <div className="flex justify-between items-center text-charcoal/60 text-xs font-semibold uppercase tracking-wider">
+            <span>Completed Stays</span>
+            <CircleCheck size={16} className="text-blue-700" />
+          </div>
+          <div className="font-mono text-3xl font-bold text-blue-900">
+            {totalCompletedCount}
+          </div>
+          <p className="text-[11px] text-charcoal/60">
+            Successfully checked-out guests &amp; concluded events
+          </p>
+        </div>
+
+        <div className="bg-card border border-emerald-300 bg-emerald-50/30 p-5 rounded-lg shadow-sm space-y-2">
+          <div className="flex justify-between items-center text-emerald-800 text-xs font-semibold uppercase tracking-wider">
+            <span>Advance Payments Collected</span>
+            <IndianRupee size={16} className="text-emerald-600" />
+          </div>
+          <div className="font-mono text-3xl font-bold text-emerald-800">
+            ₹{totalPaidCollected.toLocaleString("en-IN")}
+          </div>
+          <p className="text-[11px] text-emerald-900/70">
+            Initial advance deposits + partial payment installments
+          </p>
+        </div>
+
+        <div className="bg-card border border-amber-300 bg-amber-50/30 p-5 rounded-lg shadow-sm space-y-2">
+          <div className="flex justify-between items-center text-amber-900 text-xs font-semibold uppercase tracking-wider">
+            <span>Outstanding Balance Due</span>
+            <Clock size={16} className="text-amber-600" />
+          </div>
+          <div className="font-mono text-3xl font-bold text-amber-900">
+            ₹{totalBalanceDue.toLocaleString("en-IN")}
+          </div>
+          <p className="text-[11px] text-amber-900/70">
+            Pending final balance to be collected at resort
+          </p>
+        </div>
+      </div>
+
+      {/* Revenue Stream Visualizer Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-card border border-border/60 p-6 rounded-lg shadow-sm space-y-4">
+          <div className="flex justify-between items-center">
+            <h4 className="font-serif text-lg text-[color:var(--forest)] font-bold flex items-center gap-2">
+              <BedDouble size={18} className="text-gold-dark" /> Room Stays Performance
+            </h4>
+            <span className="font-mono font-bold text-sm text-[color:var(--forest)]">
+              ₹{roomGrossTotal.toLocaleString("en-IN")}
+            </span>
+          </div>
+
+          <div className="space-y-2 text-xs">
+            <div className="flex justify-between text-charcoal/70">
+              <span>Room Reservations:</span>
+              <span className="font-semibold">{filteredRoomBookings.length} Stays</span>
+            </div>
+            <div className="flex justify-between text-charcoal/70">
+              <span>Advance Collected:</span>
+              <span className="font-semibold text-emerald-800">₹{roomPaidTotal.toLocaleString("en-IN")}</span>
+            </div>
+            <div className="flex justify-between text-charcoal/70">
+              <span>Balance Pending:</span>
+              <span className="font-semibold text-amber-800">₹{Math.max(0, roomGrossTotal - roomPaidTotal).toLocaleString("en-IN")}</span>
+            </div>
+          </div>
+
+          <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+            <div
+              className="bg-emerald-700 h-2.5 rounded-full"
+              style={{
+                width: `${totalGrossRevenue > 0 ? Math.min(100, Math.round((roomGrossTotal / totalGrossRevenue) * 100)) : 0}%`,
+              }}
+            />
+          </div>
+          <span className="text-[10px] text-charcoal/50 block">
+            {totalGrossRevenue > 0 ? Math.round((roomGrossTotal / totalGrossRevenue) * 100) : 0}% of Total Gross Revenue
+          </span>
+        </div>
+
+        <div className="bg-card border border-border/60 p-6 rounded-lg shadow-sm space-y-4">
+          <div className="flex justify-between items-center">
+            <h4 className="font-serif text-lg text-[color:var(--forest)] font-bold flex items-center gap-2">
+              <Sparkles size={18} className="text-gold-dark" /> Event Banquets Performance
+            </h4>
+            <span className="font-mono font-bold text-sm text-[color:var(--forest)]">
+              ₹{eventGrossTotal.toLocaleString("en-IN")}
+            </span>
+          </div>
+
+          <div className="space-y-2 text-xs">
+            <div className="flex justify-between text-charcoal/70">
+              <span>Event Reservations:</span>
+              <span className="font-semibold">{filteredEventBookings.length} Banquets</span>
+            </div>
+            <div className="flex justify-between text-charcoal/70">
+              <span>Advance Collected:</span>
+              <span className="font-semibold text-emerald-800">₹{eventPaidTotal.toLocaleString("en-IN")}</span>
+            </div>
+            <div className="flex justify-between text-charcoal/70">
+              <span>Balance Pending:</span>
+              <span className="font-semibold text-amber-800">₹{Math.max(0, eventGrossTotal - eventPaidTotal).toLocaleString("en-IN")}</span>
+            </div>
+          </div>
+
+          <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+            <div
+              className="bg-amber-600 h-2.5 rounded-full"
+              style={{
+                width: `${totalGrossRevenue > 0 ? Math.min(100, Math.round((eventGrossTotal / totalGrossRevenue) * 100)) : 0}%`,
+              }}
+            />
+          </div>
+          <span className="text-[10px] text-charcoal/50 block">
+            {totalGrossRevenue > 0 ? Math.round((eventGrossTotal / totalGrossRevenue) * 100) : 0}% of Total Gross Revenue
+          </span>
+        </div>
+      </div>
+
+      {/* Master Consolidated Monthly Bookings Table */}
+      <div className="bg-card border border-border/60 shadow-lg p-6 md:p-8">
+        <h4 className="font-serif text-xl text-[color:var(--forest)] mb-2">
+          Consolidated Monthly Financial Ledger ({filteredRoomBookings.length + filteredEventBookings.length} Entries)
+        </h4>
+        <p className="text-xs text-charcoal/60 mb-6">
+          Detailed itemized record of all room stays and event bookings for {selectedMonth === "all" ? "All Time" : formatMonthLabel(selectedMonth)}.
+        </p>
+
+        <div className="overflow-x-auto border border-border/40">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="bg-sand/30 border-b border-border/60 text-[10px] font-bold uppercase tracking-wider text-charcoal/70">
+                <th className="p-3">Booking ID</th>
+                <th className="p-3">Category</th>
+                <th className="p-3">Client &amp; Contact</th>
+                <th className="p-3">Location / Venue</th>
+                <th className="p-3">Dates</th>
+                <th className="p-3 text-right">Grand Total</th>
+                <th className="p-3 text-right">Paid</th>
+                <th className="p-3 text-right">Balance Due</th>
+                <th className="p-3 text-center">Status</th>
+                <th className="p-3 text-right">Invoice</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/40">
+              {filteredRoomBookings.map((b) => {
+                const extraChargesSum = (b.extraCharges || []).reduce((acc, c) => acc + c.amount, 0);
+                const calculatedBase = (b.pricePerNight || 3500) * (b.totalNights || 1) * (b.roomsCount || 1);
+                const grandTotal =
+                  b.customGrandTotal !== undefined && b.customGrandTotal !== null
+                    ? b.customGrandTotal + extraChargesSum
+                    : calculatedBase + extraChargesSum;
+
+                let initialAdv = typeof b.payment?.amountPaid === "number" ? b.payment.amountPaid : 0;
+                if (b.payment?.provider === "razorpay" && initialAdv >= 100) {
+                  initialAdv = Math.round(initialAdv / 100);
+                } else if (initialAdv > 5000) {
+                  initialAdv = Math.round(initialAdv / 100);
+                }
+                const partials = (b.paymentsHistory || []).reduce((acc, p) => acc + p.amount, 0);
+                const paid = initialAdv + partials;
+                const due = Math.max(0, grandTotal - paid);
+
+                return (
+                  <tr key={b.id} className="hover:bg-sand/10 transition-colors">
+                    <td className="p-3 font-mono font-bold text-gold-dark">{b.id}</td>
+                    <td className="p-3">
+                      <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-blue-100 text-blue-800 rounded">
+                        Room Stay
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <div className="font-semibold text-charcoal">{b.userName}</div>
+                      <div className="text-[10px] text-charcoal/60">{b.userEmail}</div>
+                    </td>
+                    <td className="p-3 capitalize">{b.property || "mysore"} &bull; {b.roomTypeSlug}</td>
+                    <td className="p-3 font-mono text-[11px]">{b.checkIn} → {b.checkOut}</td>
+                    <td className="p-3 text-right font-mono font-bold text-charcoal">₹{grandTotal.toLocaleString("en-IN")}</td>
+                    <td className="p-3 text-right font-mono font-bold text-emerald-700">₹{paid.toLocaleString("en-IN")}</td>
+                    <td className="p-3 text-right font-mono font-bold text-amber-800">₹{due.toLocaleString("en-IN")}</td>
+                    <td className="p-3 text-center">
+                      <span
+                        className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded ${
+                          b.status === "confirmed"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : b.status === "checked_in"
+                              ? "bg-blue-100 text-blue-800"
+                              : b.status === "checked_out"
+                                ? "bg-gray-200 text-gray-800"
+                                : "bg-amber-100 text-amber-800"
+                        }`}
+                      >
+                        {b.status}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => onViewBill(b)}
+                        className="px-2 py-1 bg-emerald-800 hover:bg-emerald-900 text-white text-[10px] font-semibold uppercase tracking-wider rounded-xs transition-colors inline-flex items-center gap-1 cursor-pointer"
+                        title="View Tax Invoice"
+                      >
+                        <FileText size={11} /> Bill
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {filteredEventBookings.map((eb) => {
+                const extraChargesSum = (eb.extraCharges || []).reduce((acc, c) => acc + c.amount, 0);
+                const baseTotal = eb.totalAmount || 50000;
+                const grandTotal =
+                  eb.customGrandTotal !== undefined && eb.customGrandTotal !== null
+                    ? eb.customGrandTotal + extraChargesSum
+                    : baseTotal + extraChargesSum;
+
+                const initialAdv = eb.advanceAmount || 0;
+                const partials = (eb.paymentsHistory || []).reduce((acc, p) => acc + p.amount, 0);
+                const paid = initialAdv + partials;
+                const due = Math.max(0, grandTotal - paid);
+
+                return (
+                  <tr key={eb.id} className="hover:bg-sand/10 transition-colors">
+                    <td className="p-3 font-mono font-bold text-gold-dark">{eb.id}</td>
+                    <td className="p-3">
+                      <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-amber-100 text-amber-900 rounded">
+                        Event Banquet
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <div className="font-semibold text-charcoal">{eb.userName}</div>
+                      <div className="text-[10px] text-charcoal/60">{eb.userEmail}</div>
+                    </td>
+                    <td className="p-3 capitalize">{eb.property || "mysore"} &bull; {eb.venue}</td>
+                    <td className="p-3 font-mono text-[11px]">{eb.eventDate}</td>
+                    <td className="p-3 text-right font-mono font-bold text-charcoal">₹{grandTotal.toLocaleString("en-IN")}</td>
+                    <td className="p-3 text-right font-mono font-bold text-emerald-700">₹{paid.toLocaleString("en-IN")}</td>
+                    <td className="p-3 text-right font-mono font-bold text-amber-800">₹{due.toLocaleString("en-IN")}</td>
+                    <td className="p-3 text-center">
+                      <span
+                        className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded ${
+                          eb.status === "confirmed"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : eb.status === "checked_in"
+                              ? "bg-blue-100 text-blue-800"
+                              : eb.status === "checked_out"
+                                ? "bg-gray-200 text-gray-800"
+                                : "bg-amber-100 text-amber-800"
+                        }`}
+                      >
+                        {eb.status}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => onViewBill(eb)}
+                        className="px-2 py-1 bg-emerald-800 hover:bg-emerald-900 text-white text-[10px] font-semibold uppercase tracking-wider rounded-xs transition-colors inline-flex items-center gap-1 cursor-pointer"
+                        title="View Tax Invoice"
+                      >
+                        <FileText size={11} /> Bill
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {filteredRoomBookings.length === 0 && filteredEventBookings.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="text-center py-12 text-sm text-charcoal/50">
+                    No bookings found matching selected report filters.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 1. ADMIN CONSOLE
 // ---------------------------------------------------------------------------
 function AdminConsole({
@@ -385,7 +1054,7 @@ function AdminConsole({
 }) {
   const [selectedProperty, setSelectedProperty] = useState(locations[0]?.key || "mysore");
   const [activeTab, setActiveTab] = useState<
-    "bookings" | "timeline" | "rooms" | "locations" | "gallery" | "events"
+    "reports" | "bookings" | "timeline" | "rooms" | "locations" | "gallery" | "events"
   >("bookings");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<BookingStatusFilter>("all");
@@ -607,6 +1276,7 @@ function AdminConsole({
   const propertyRooms = rooms.filter((r) => r.property === selectedProperty);
 
   const tabItems: { key: typeof activeTab; label: string; icon: React.ReactNode }[] = [
+    { key: "reports", label: "Report", icon: <FileText size={14} /> },
     { key: "bookings", label: "Bookings", icon: <Calendar size={14} /> },
     { key: "timeline", label: "Timeline", icon: <TrendingUp size={14} /> },
     { key: "rooms", label: "Rooms", icon: <BedDouble size={14} /> },
@@ -671,7 +1341,7 @@ function AdminConsole({
 
       {/* Book Room Modal */}
       {showBookModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto print:hidden">
           <div className="bg-card border border-[color:var(--gold)]/40 shadow-2xl max-w-lg w-full p-6 space-y-4 relative animate-in fade-in zoom-in duration-200 my-8">
             <div className="flex justify-between items-center border-b border-border pb-3">
               <h3 className="font-serif text-xl font-bold text-[color:var(--forest)] flex items-center gap-2">
@@ -879,7 +1549,7 @@ function AdminConsole({
 
       {/* Guest Details Modal */}
       {selectedGuestBooking && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-start justify-center p-3 sm:p-6 overflow-y-auto animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-start justify-center p-3 sm:p-6 overflow-y-auto animate-fade-in print:hidden">
           <div className="bg-card border border-[color:var(--gold)]/40 shadow-2xl max-w-2xl w-full p-6 space-y-6 relative animate-in fade-in zoom-in duration-200 mt-4 mb-16 sm:mt-6 sm:mb-20 rounded-xl">
             <div className="flex justify-between items-center border-b border-border pb-3">
               <div>
@@ -1092,8 +1762,7 @@ function AdminConsole({
               }
 
               const baseRoomTotal = pricePerNight * nights * (selectedGuestBooking.roomsCount || 1);
-              const baseGst = Math.round(baseRoomTotal * 0.18);
-              const calculatedBaseGrandTotal = baseRoomTotal + baseGst;
+              const calculatedBaseGrandTotal = baseRoomTotal;
 
               const extraChargesList = selectedGuestBooking.extraCharges || [];
               const extraChargesSum = extraChargesList.reduce((acc, c) => acc + c.amount, 0);
@@ -1105,10 +1774,17 @@ function AdminConsole({
 
               const grandTotal = effectiveBaseTotal + extraChargesSum;
 
-              const initAdvance =
+              let initAdvance =
                 typeof selectedGuestBooking.payment?.amountPaid === "number"
                   ? selectedGuestBooking.payment.amountPaid
                   : 0;
+
+              if (selectedGuestBooking.payment?.provider === "razorpay" && initAdvance >= 100) {
+                initAdvance = Math.round(initAdvance / 100);
+              } else if (initAdvance > 5000) {
+                initAdvance = Math.round(initAdvance / 100);
+              }
+
               const ledgerTotal = (selectedGuestBooking.paymentsHistory || []).reduce((acc, p) => acc + p.amount, 0);
               const totalPaidToDate = initAdvance + ledgerTotal;
               const remainingBalance = Math.max(0, grandTotal - totalPaidToDate);
@@ -1160,7 +1836,7 @@ function AdminConsole({
                         </button>
                       </div>
                       <p className="text-[10px] text-amber-800 italic">
-                        Calculated default room tariff ({nights} night(s) @ ₹{pricePerNight}/night + 18% GST) was ₹{calculatedBaseGrandTotal.toLocaleString("en-IN")}.
+                        Calculated default room tariff ({nights} night(s) @ ₹{pricePerNight}/night) was ₹{calculatedBaseGrandTotal.toLocaleString("en-IN")}.
                       </p>
                     </div>
                   )}
@@ -1321,25 +1997,68 @@ function AdminConsole({
               );
             })()}
 
-            {/* Email Notification Status */}
-            <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-lg flex justify-between items-center text-xs">
-              <div className="flex items-center gap-2 text-emerald-900 font-medium">
-                <Mail size={15} className="text-emerald-700" />
-                <span>
-                  Notification Email: <strong className="text-emerald-800">Sent &amp; Confirmed</strong>
-                </span>
+            {/* Email Notification Status & Manual Trigger Actions */}
+            <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-lg space-y-2 text-xs">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div className="flex items-center gap-2 text-emerald-900 font-medium">
+                  <Mail size={16} className="text-emerald-700 shrink-0" />
+                  <span>
+                    Email Service: <strong className="text-emerald-800">Active</strong> ({selectedGuestBooking.userEmail})
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setResendNotifyMsg("Sending confirmation email...");
+                      const res = await sendBookingConfirmationEmail({ data: { booking: selectedGuestBooking } });
+                      if (res.success) {
+                        setResendNotifyMsg(`Booking confirmation email sent to ${selectedGuestBooking.userEmail}`);
+                      } else {
+                        setResendNotifyMsg(`Failed to send email: ${res.error || "Check SMTP settings"}`);
+                      }
+                      setTimeout(() => setResendNotifyMsg(""), 4000);
+                    }}
+                    className="text-[11px] bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-2.5 py-1 rounded transition-colors cursor-pointer"
+                  >
+                    Resend Booking Email
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setResendNotifyMsg("Sending Check-In welcome email...");
+                      const res = await sendCheckInEmail({ data: { booking: selectedGuestBooking } });
+                      if (res.success) {
+                        setResendNotifyMsg(`Check-In welcome email sent to ${selectedGuestBooking.userEmail}`);
+                      } else {
+                        setResendNotifyMsg(`Failed to send email: ${res.error || "Check SMTP settings"}`);
+                      }
+                      setTimeout(() => setResendNotifyMsg(""), 4000);
+                    }}
+                    className="text-[11px] bg-teal-700 hover:bg-teal-800 text-white font-semibold px-2.5 py-1 rounded transition-colors cursor-pointer"
+                  >
+                    Send Check-In Email
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setResendNotifyMsg("Sending Check-Out thank you email...");
+                      const res = await sendCheckOutEmail({ data: { booking: selectedGuestBooking } });
+                      if (res.success) {
+                        setResendNotifyMsg(`Check-Out thank you email sent to ${selectedGuestBooking.userEmail}`);
+                      } else {
+                        setResendNotifyMsg(`Failed to send email: ${res.error || "Check SMTP settings"}`);
+                      }
+                      setTimeout(() => setResendNotifyMsg(""), 4000);
+                    }}
+                    className="text-[11px] bg-blue-700 hover:bg-blue-800 text-white font-semibold px-2.5 py-1 rounded transition-colors cursor-pointer"
+                  >
+                    Send Check-Out Email
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={() => {
-                  setResendNotifyMsg(
-                    `Booking confirmation and tax invoice re-sent to ${selectedGuestBooking.userEmail}`,
-                  );
-                  setTimeout(() => setResendNotifyMsg(""), 3000);
-                }}
-                className="text-[11px] bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-2.5 py-1 rounded transition-colors"
-              >
-                Resend Email
-              </button>
             </div>
 
             {resendNotifyMsg && (
@@ -1375,7 +2094,7 @@ function AdminConsole({
 
       {/* ID Image Lightbox Modal */}
       {expandedIdImage && (
-        <div className="fixed inset-0 z-[120] bg-black/80 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[120] bg-black/80 flex items-center justify-center p-4 print:hidden">
           <div className="relative max-w-2xl w-full bg-white p-4 rounded-xl shadow-2xl space-y-3">
             <div className="flex justify-between items-center">
               <h4 className="font-semibold text-sm text-charcoal">ID Proof Photo Preview</h4>
@@ -1393,6 +2112,16 @@ function AdminConsole({
             />
           </div>
         </div>
+      )}
+
+      {/* VIEW 0: REPORTS & OPERATIONAL ANALYTICS */}
+      {activeTab === "reports" && (
+        <ReportsManagement
+          bookings={bookings}
+          eventBookings={eventBookings}
+          locations={locations}
+          onViewBill={(b) => setInvoiceBooking(b)}
+        />
       )}
 
       {/* VIEW 1: BOOKINGS LIST */}
@@ -2232,7 +2961,7 @@ function RoomsManager({
     property: locations[0]?.key || "",
     roomTypeSlug: ROOMS[0]?.slug || "deluxe-room",
     advanceAmount: 1,
-    pricePerNight: 3500,
+    pricePerNight: 7000,
     maxGuests: 4,
     maxAdults: 2,
     maxKids: 1,
@@ -2574,7 +3303,7 @@ function RoomsManager({
                 type="number"
                 min="0"
                 step="100"
-                placeholder="e.g. 3500"
+                placeholder="e.g. 7000"
                 value={newRoom.pricePerNight}
                 onChange={(e) =>
                   setNewRoom({ ...newRoom, pricePerNight: Math.max(0, Number(e.target.value)) })
@@ -2898,7 +3627,7 @@ function RoomsManager({
 
       {/* EDIT ROOM DETAILS MODAL */}
       {editingRoomFull && editRoomForm && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-start justify-center p-3 sm:p-6 overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-start justify-center p-3 sm:p-6 overflow-y-auto print:hidden">
           <div className="bg-white border border-[color:var(--gold)]/40 shadow-2xl max-w-2xl w-full p-6 my-8 space-y-5 relative text-charcoal rounded-sm">
             <div className="flex items-center justify-between border-b border-border/40 pb-3">
               <h3 className="font-serif text-xl font-bold text-[color:var(--forest)] flex items-center gap-2">
@@ -2968,7 +3697,7 @@ function RoomsManager({
                   type="number"
                   min="0"
                   step="100"
-                  value={editRoomForm.pricePerNight ?? 3500}
+                  value={editRoomForm.pricePerNight ?? 7000}
                   onChange={(e) =>
                     setEditRoomForm({
                       ...editRoomForm,
@@ -3576,6 +4305,8 @@ function EventsManager({
   const [isEditingTotal, setIsEditingTotal] = useState(false);
   const [customTotalInput, setCustomTotalInput] = useState("");
 
+  const [resendNotifyMsg, setResendNotifyMsg] = useState("");
+
   const handleManualEventSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setManualError("");
@@ -3744,7 +4475,7 @@ function EventsManager({
       </div>
 
       {showManualModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto print:hidden">
           <div className="bg-card border border-[color:var(--gold)]/40 shadow-2xl max-w-lg w-full p-6 space-y-4 relative animate-in fade-in zoom-in duration-200 my-8">
             <div className="flex justify-between items-center border-b border-border pb-3">
               <h3 className="font-serif text-xl font-bold text-[color:var(--forest)] flex items-center gap-2">
@@ -3796,9 +4527,6 @@ function EventsManager({
                       {ev.title} ({ev.venue} - {ev.property.toUpperCase()})
                     </option>
                   ))}
-                  <option value="Custom Function Hall Banquet">Custom Function Hall Banquet</option>
-                  <option value="Wedding & Lawn Party">Wedding &amp; Lawn Party</option>
-                  <option value="Corporate Off-site & Conference">Corporate Off-site &amp; Conference</option>
                 </select>
               </div>
 
@@ -3990,170 +4718,473 @@ function EventsManager({
       )}
 
       {selectedLedgerEvent && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-card border border-[color:var(--gold)]/40 shadow-2xl max-w-xl w-full p-6 space-y-4 relative text-charcoal rounded-sm animate-in fade-in zoom-in duration-200 my-8">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-start justify-center p-3 sm:p-6 overflow-y-auto animate-fade-in print:hidden">
+          <div className="bg-card border border-[color:var(--gold)]/40 shadow-2xl max-w-2xl w-full p-6 space-y-6 relative animate-in fade-in zoom-in duration-200 mt-4 mb-16 sm:mt-6 sm:mb-20 rounded-xl">
             <div className="flex justify-between items-center border-b border-border pb-3">
-              <h3 className="font-serif text-xl font-bold text-[color:var(--forest)] flex items-center gap-2">
-                <IndianRupee className="text-[color:var(--gold)]" size={20} />
-                Event Payment Ledger: {selectedLedgerEvent.id}
-              </h3>
+              <div>
+                <h3 className="font-serif text-xl font-bold text-[color:var(--forest)] flex items-center gap-2">
+                  <Sparkles size={18} className="text-gold" /> Member &amp; Event Booking Details
+                </h3>
+                <p className="text-xs text-charcoal/60 mt-0.5">
+                  Booking ID: <span className="font-mono font-bold text-gold-dark">{selectedLedgerEvent.id}</span>
+                </p>
+              </div>
               <button
-                onClick={() => setSelectedLedgerEvent(null)}
-                className="text-charcoal/50 hover:text-charcoal cursor-pointer"
+                onClick={() => {
+                  setSelectedLedgerEvent(null);
+                  setPayMsg("");
+                  setExtraMsg("");
+                }}
+                className="text-charcoal/50 hover:text-charcoal cursor-pointer p-1"
               >
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
 
-            <div className="text-xs text-charcoal/70 space-y-1 bg-[color:var(--sand)]/20 p-3 border border-border/60">
-              <div><strong className="text-charcoal">Client:</strong> {selectedLedgerEvent.userName} ({selectedLedgerEvent.userEmail})</div>
-              <div><strong className="text-charcoal font-semibold">Event / Venue:</strong> {selectedLedgerEvent.eventTitle} ({selectedLedgerEvent.venue})</div>
-              <div><strong className="text-charcoal font-semibold">Event Date:</strong> {selectedLedgerEvent.eventDate} &bull; Guests: {selectedLedgerEvent.guestsCount}</div>
+            {/* Client Info & Contact */}
+            <div className="bg-sand/15 p-4 rounded-lg border border-sand-dark/20 space-y-3">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h4 className="text-base font-bold text-charcoal">
+                    {selectedLedgerEvent.userName}
+                  </h4>
+                  <div className="flex items-center gap-3 text-xs text-charcoal/80 mt-1">
+                    <a
+                      href={`mailto:${selectedLedgerEvent.userEmail}`}
+                      className="inline-flex items-center gap-1 text-emerald-800 hover:underline"
+                    >
+                      <Mail size={12} /> {selectedLedgerEvent.userEmail}
+                    </a>
+                    <a
+                      href={`tel:${selectedLedgerEvent.guestDetails?.mobile}`}
+                      className="inline-flex items-center gap-1 text-emerald-800 hover:underline"
+                    >
+                      <Phone size={12} /> {selectedLedgerEvent.guestDetails?.mobile || "N/A"}
+                    </a>
+                  </div>
+                </div>
+                <span
+                  className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full ${
+                    selectedLedgerEvent.status === "confirmed"
+                      ? "bg-emerald-100 text-emerald-800"
+                      : selectedLedgerEvent.status === "pending"
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-gray-200 text-gray-700"
+                  }`}
+                >
+                  {selectedLedgerEvent.status}
+                </span>
+              </div>
             </div>
 
+            {/* Event & Venue Details Grid */}
+            <div className="grid grid-cols-2 gap-4 text-xs">
+              <div className="p-3 bg-card border border-border/60 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-charcoal/50 block">Resort Property</span>
+                <span className="font-semibold text-charcoal capitalize">{selectedLedgerEvent.property}</span>
+              </div>
+              <div className="p-3 bg-card border border-border/60 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-charcoal/50 block">Venue / Hall Name</span>
+                <span className="font-semibold text-[color:var(--forest)] font-mono">
+                  {selectedLedgerEvent.venue}
+                </span>
+              </div>
+              <div className="p-3 bg-card border border-border/60 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-charcoal/50 block">Event Title &amp; Date</span>
+                <span className="font-semibold text-charcoal">
+                  {selectedLedgerEvent.eventTitle} ({selectedLedgerEvent.eventDate})
+                </span>
+              </div>
+              <div className="p-3 bg-card border border-border/60 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-charcoal/50 block">Guests Count</span>
+                <span className="font-semibold text-charcoal">
+                  {selectedLedgerEvent.guestsCount} Guests Expected
+                </span>
+              </div>
+            </div>
+
+            {/* Event Operations Panel (Check In / Check Out) */}
+            <div className="p-4 bg-sand/20 border border-sand-dark/30 rounded-lg space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-charcoal uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock size={14} className="text-gold-dark" /> Event &amp; Venue Operations
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      checkInEventBooking(selectedLedgerEvent.id);
+                      setSelectedLedgerEvent({
+                        ...selectedLedgerEvent,
+                        status: "checked_in",
+                        checkedInAt: new Date().toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }),
+                      });
+                    }}
+                    disabled={
+                      selectedLedgerEvent.status === "checked_in" ||
+                      selectedLedgerEvent.status === "checked_out"
+                    }
+                    className="px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider bg-emerald-700 hover:bg-emerald-800 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded transition-colors flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed"
+                  >
+                    <LogIn size={13} /> Check In Event
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      checkOutEventBooking(selectedLedgerEvent.id);
+                      setSelectedLedgerEvent({
+                        ...selectedLedgerEvent,
+                        status: "checked_out",
+                        checkedOutAt: new Date().toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }),
+                      });
+                    }}
+                    disabled={selectedLedgerEvent.status !== "checked_in"}
+                    className="px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider bg-blue-700 hover:bg-blue-800 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded transition-colors flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed"
+                  >
+                    <LogOut size={13} /> Check Out Event
+                  </button>
+                </div>
+              </div>
+
+              {/* Recorded Operations Timestamps */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
+                <div className="p-2.5 rounded bg-white border border-sand-dark/20">
+                  <span className="text-[10px] uppercase font-bold text-charcoal/50 block">Actual Event Check-In</span>
+                  {selectedLedgerEvent.checkedInAt ? (
+                    <span className="font-semibold text-emerald-800 flex items-center gap-1 mt-0.5">
+                      <Check size={12} className="text-emerald-600" /> {selectedLedgerEvent.checkedInAt}
+                    </span>
+                  ) : (
+                    <span className="text-amber-800 italic text-[11px] mt-0.5 block">Not checked in yet</span>
+                  )}
+                </div>
+
+                <div className="p-2.5 rounded bg-white border border-sand-dark/20">
+                  <span className="text-[10px] uppercase font-bold text-charcoal/50 block">Actual Event Check-Out</span>
+                  {selectedLedgerEvent.checkedOutAt ? (
+                    <span className="font-semibold text-blue-800 flex items-center gap-1 mt-0.5">
+                      <Check size={12} className="text-blue-600" /> {selectedLedgerEvent.checkedOutAt}
+                    </span>
+                  ) : (
+                    <span className="text-charcoal/50 italic text-[11px] mt-0.5 block">
+                      {selectedLedgerEvent.checkedInAt ? "Event currently ongoing" : "Not checked out yet"}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Financial Ledger & Payment Structure */}
             {(() => {
-              const extraChargesSum = (selectedLedgerEvent.extraCharges || []).reduce((s, c) => s + c.amount, 0);
+              const extraChargesList = selectedLedgerEvent.extraCharges || [];
+              const extraChargesSum = extraChargesList.reduce((acc, c) => acc + c.amount, 0);
               const baseTotal = selectedLedgerEvent.totalAmount || 50000;
-              const grandTotal = selectedLedgerEvent.customGrandTotal !== undefined ? selectedLedgerEvent.customGrandTotal + extraChargesSum : baseTotal + extraChargesSum;
+              const grandTotal =
+                selectedLedgerEvent.customGrandTotal !== undefined && selectedLedgerEvent.customGrandTotal !== null
+                  ? selectedLedgerEvent.customGrandTotal + extraChargesSum
+                  : baseTotal + extraChargesSum;
 
               const initialAdv = selectedLedgerEvent.advanceAmount || 0;
-              const paymentsSum = (selectedLedgerEvent.paymentsHistory || []).reduce((s, p) => s + p.amount, 0);
-              const totalPaid = paymentsSum > 0 ? paymentsSum : initialAdv;
-              const balanceDue = Math.max(0, grandTotal - totalPaid);
+              const ledgerTotal = (selectedLedgerEvent.paymentsHistory || []).reduce((acc, p) => acc + p.amount, 0);
+              const totalPaidToDate = initialAdv + ledgerTotal;
+              const remainingBalance = Math.max(0, grandTotal - totalPaidToDate);
 
               return (
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-sm space-y-3">
-                  <div className="flex justify-between items-center border-b border-amber-200 pb-2">
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-amber-900 block">Total Banquet Fee</span>
-                      {isEditingTotal ? (
-                        <div className="flex items-center gap-2 mt-1">
-                          <input
-                            type="number"
-                            value={customTotalInput}
-                            onChange={(e) => setCustomTotalInput(e.target.value)}
-                            className="bg-white border border-amber-400 font-mono font-bold px-2 py-0.5 text-xs w-28"
-                          />
-                          <button onClick={handleSaveCustomTotal} className="bg-amber-800 text-white text-[10px] font-bold px-2 py-1 rounded">Save</button>
-                        </div>
-                      ) : (
-                        <div className="font-serif text-xl font-bold text-amber-950 flex items-center gap-2">
-                          ₹{grandTotal.toLocaleString("en-IN")}
-                          <button onClick={() => { setCustomTotalInput(String(grandTotal)); setIsEditingTotal(true); }} className="text-[10px] font-sans font-normal text-amber-700 underline">Edit Total</button>
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] uppercase font-bold text-emerald-900 block">Total Amount Paid</span>
-                      <div className="font-serif text-xl font-bold text-emerald-700">₹{totalPaid.toLocaleString("en-IN")}</div>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] uppercase font-bold text-red-900 block">Balance Due</span>
-                      <div className="font-serif text-xl font-bold text-red-700">₹{balanceDue.toLocaleString("en-IN")}</div>
+                <div className="p-4 bg-white border border-sand-dark/30 rounded-lg space-y-4">
+                  <div className="flex justify-between items-center border-b border-sand-dark/20 pb-2">
+                    <span className="text-xs font-bold text-charcoal uppercase tracking-wider flex items-center gap-1.5">
+                      <IndianRupee size={14} className="text-gold-dark" /> Structured Payment Ledger &amp; Balance
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-bold text-charcoal">
+                        Grand Total: ₹{grandTotal.toLocaleString("en-IN")}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditingTotal(!isEditingTotal);
+                          setCustomTotalInput((selectedLedgerEvent.customGrandTotal ?? baseTotal).toString());
+                        }}
+                        className="text-[10px] font-semibold text-[color:var(--forest)] underline hover:text-[color:var(--gold)] cursor-pointer"
+                      >
+                        {isEditingTotal ? "Cancel Edit" : "Edit Grand Total"}
+                      </button>
                     </div>
                   </div>
 
-                  {(selectedLedgerEvent.paymentsHistory || []).length > 0 && (
-                    <div className="space-y-1 pt-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-900 block">Payments Log:</span>
-                      <div className="divide-y divide-amber-200 text-xs">
-                        {(selectedLedgerEvent.paymentsHistory || []).map((p) => (
-                          <div key={p.id} className="py-1 flex justify-between items-center">
-                            <div><span className="font-semibold text-charcoal">{p.mode}</span> <span className="text-[10px] text-charcoal/60">({p.date}) {p.notes && `- ${p.notes}`}</span></div>
-                            <div className="font-mono font-bold text-emerald-800">₹{p.amount.toLocaleString("en-IN")}</div>
-                          </div>
-                        ))}
+                  {/* Inline Grand Total Override */}
+                  {isEditingTotal && (
+                    <div className="p-3 bg-amber-50 border border-amber-300 rounded space-y-2 text-xs">
+                      <span className="font-bold text-amber-900 block">
+                        Override Event Banquet Base Total (before extra charges):
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm">₹</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={customTotalInput}
+                          onChange={(e) => setCustomTotalInput(e.target.value)}
+                          className="w-32 bg-white border border-amber-300 px-3 py-1.5 font-mono font-bold text-xs focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSaveCustomTotal}
+                          className="px-3 py-1.5 bg-[color:var(--forest)] text-ivory font-semibold text-xs rounded uppercase tracking-wider hover:bg-[color:var(--gold)] hover:text-black transition-colors cursor-pointer"
+                        >
+                          Save New Grand Total
+                        </button>
                       </div>
                     </div>
                   )}
 
-                  {(selectedLedgerEvent.extraCharges || []).length > 0 && (
-                    <div className="space-y-1 pt-2 border-t border-amber-200">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-900 block">Extra Charges &amp; Add-ons:</span>
-                      <div className="divide-y divide-amber-200 text-xs">
-                        {(selectedLedgerEvent.extraCharges || []).map((c) => (
-                          <div key={c.id} className="py-1 flex justify-between items-center">
-                            <div><span className="font-medium text-amber-950">{c.reason}</span> <span className="text-[10px] text-charcoal/60">({c.date})</span></div>
-                            <div className="font-mono font-bold text-amber-900">+₹{c.amount.toLocaleString("en-IN")}</div>
-                          </div>
-                        ))}
-                      </div>
+                  {/* Summary Bar */}
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="p-2 bg-sand/20 rounded border border-sand-dark/10">
+                      <span className="text-[9px] uppercase font-bold text-charcoal/60 block">Grand Total</span>
+                      <span className="font-mono font-bold text-charcoal">₹{grandTotal.toLocaleString("en-IN")}</span>
                     </div>
-                  )}
+                    <div className="p-2 bg-emerald-50 rounded border border-emerald-200">
+                      <span className="text-[9px] uppercase font-bold text-emerald-800 block">Total Paid</span>
+                      <span className="font-mono font-bold text-emerald-700">₹{totalPaidToDate.toLocaleString("en-IN")}</span>
+                    </div>
+                    <div className={`p-2 rounded border ${remainingBalance === 0 ? "bg-emerald-100 border-emerald-300 text-emerald-900" : "bg-amber-50 border-amber-300 text-amber-900"}`}>
+                      <span className="text-[9px] uppercase font-bold block">Balance Due</span>
+                      <span className="font-mono font-bold">₹{remainingBalance.toLocaleString("en-IN")}</span>
+                    </div>
+                  </div>
+
+                  {/* Extra Charges Section */}
+                  <div className="space-y-2 pt-2 border-t border-sand-dark/10">
+                    <span className="text-[11px] font-semibold text-charcoal/80 block">
+                      Extra Charges &amp; Bill Adjustments (e.g. Stage Decor, DJ &amp; Sound, Catering Add-ons):
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <input
+                        type="number"
+                        placeholder="Extra Amount (₹)"
+                        value={extraAmount}
+                        onChange={(e) => setExtraAmount(e.target.value)}
+                        className="bg-transparent border border-border px-3 py-1.5 text-xs focus:outline-none focus:border-gold font-mono"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Reason (e.g. Stage Decor & Sound Setup)"
+                        value={extraReason}
+                        onChange={(e) => setExtraReason(e.target.value)}
+                        className="bg-transparent border border-border px-3 py-1.5 text-xs focus:outline-none focus:border-gold sm:col-span-2"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddExtraChargeRecord}
+                      className="w-full bg-amber-700 hover:bg-amber-800 text-white font-semibold py-1.5 text-xs rounded uppercase tracking-wider transition-colors cursor-pointer"
+                    >
+                      + Add Extra Charge / Adjustment
+                    </button>
+                    {extraMsg && <p className="text-xs text-center text-amber-800 font-medium">{extraMsg}</p>}
+
+                    {extraChargesList.length > 0 && (
+                      <div className="overflow-x-auto pt-1">
+                        <table className="w-full text-left text-xs border-collapse border border-amber-200">
+                          <thead>
+                            <tr className="bg-amber-100/60 text-amber-900 font-semibold text-[10px] uppercase tracking-wider">
+                              <th className="p-1.5">Date</th>
+                              <th className="p-1.5">Reason / Description</th>
+                              <th className="p-1.5 text-right">Extra Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-amber-200/50 bg-amber-50/20">
+                            {extraChargesList.map((chg) => (
+                              <tr key={chg.id}>
+                                <td className="p-1.5 font-mono text-[11px]">{chg.date}</td>
+                                <td className="p-1.5 font-medium text-charcoal">{chg.reason}</td>
+                                <td className="p-1.5 text-right font-mono font-semibold text-amber-800">
+                                  +₹{chg.amount.toLocaleString("en-IN")}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Add Payment Form */}
+                  <div className="space-y-2 pt-2 border-t border-sand-dark/10">
+                    <span className="text-[11px] font-semibold text-charcoal/80 block">Record New Payment Entry:</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <input
+                        type="number"
+                        placeholder="Amount (₹)"
+                        value={payAmount}
+                        onChange={(e) => setPayAmount(e.target.value)}
+                        className="bg-transparent border border-border px-3 py-1.5 text-xs focus:outline-none focus:border-gold font-mono"
+                      />
+                      <select
+                        value={payMode}
+                        onChange={(e) => setPayMode(e.target.value as PaymentEntry["mode"])}
+                        className="bg-transparent border border-border px-3 py-1.5 text-xs focus:outline-none focus:border-gold"
+                      >
+                        <option value="Cash">Cash</option>
+                        <option value="UPI">UPI Payment</option>
+                        <option value="Card">Credit/Debit Card</option>
+                        <option value="Bank Transfer">Bank Transfer</option>
+                        <option value="Razorpay">Razorpay Online</option>
+                        <option value="Other">Other</option>
+                      </select>
+                      <input
+                        type="text"
+                        placeholder="Notes (e.g. Stage advance)"
+                        value={payNotes}
+                        onChange={(e) => setPayNotes(e.target.value)}
+                        className="bg-transparent border border-border px-3 py-1.5 text-xs focus:outline-none focus:border-gold"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddPaymentRecord}
+                      className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-semibold py-1.5 text-xs rounded uppercase tracking-wider transition-colors cursor-pointer"
+                    >
+                      + Add Payment Record
+                    </button>
+                    {payMsg && <p className="text-xs text-center text-emerald-800 font-medium">{payMsg}</p>}
+                  </div>
+
+                  {/* Payments History Table */}
+                  <div className="overflow-x-auto pt-2">
+                    <span className="text-[10px] uppercase font-bold text-charcoal/50 block mb-1">Payments Installment History:</span>
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-sand/30 text-charcoal/70 font-semibold text-[10px] uppercase tracking-wider">
+                          <th className="p-2">Date</th>
+                          <th className="p-2">Mode</th>
+                          <th className="p-2">Notes</th>
+                          <th className="p-2 text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-sand-dark/10">
+                        {initialAdv > 0 && (
+                          <tr>
+                            <td className="p-2 font-mono text-[11px]">Initial</td>
+                            <td className="p-2 font-medium text-emerald-800">Event Advance</td>
+                            <td className="p-2 text-charcoal/60 text-[11px]">Booking Advance</td>
+                            <td className="p-2 text-right font-mono font-semibold text-emerald-700">₹{initialAdv.toLocaleString("en-IN")}</td>
+                          </tr>
+                        )}
+                        {(selectedLedgerEvent.paymentsHistory || []).map((p) => (
+                          <tr key={p.id}>
+                            <td className="p-2 font-mono text-[11px]">{p.date}</td>
+                            <td className="p-2 font-medium text-charcoal">{p.mode}</td>
+                            <td className="p-2 text-charcoal/60 text-[11px]">{p.notes || "-"}</td>
+                            <td className="p-2 text-right font-mono font-semibold text-emerald-700">₹{p.amount.toLocaleString("en-IN")}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               );
             })()}
 
-            <div className="space-y-2 border-t border-border pt-3">
-              <span className="text-xs font-bold text-charcoal block">Record New Payment Entry:</span>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <input
-                  type="number"
-                  placeholder="Amount (₹)"
-                  value={payAmount}
-                  onChange={(e) => setPayAmount(e.target.value)}
-                  className="bg-white border border-border px-3 py-1.5 text-xs font-mono focus:border-[color:var(--gold)] focus:outline-none"
-                />
-                <select
-                  value={payMode}
-                  onChange={(e) => setPayMode(e.target.value as PaymentEntry["mode"])}
-                  className="bg-white border border-border px-3 py-1.5 text-xs focus:border-[color:var(--gold)] focus:outline-none"
-                >
-                  <option value="UPI">UPI Payment</option>
-                  <option value="Cash">Cash</option>
-                  <option value="Card">Credit/Debit Card</option>
-                  <option value="Bank Transfer">Bank Transfer</option>
-                </select>
-                <input
-                  type="text"
-                  placeholder="Notes (e.g. Stage Decor Advance)"
-                  value={payNotes}
-                  onChange={(e) => setPayNotes(e.target.value)}
-                  className="bg-white border border-border px-3 py-1.5 text-xs focus:border-[color:var(--gold)] focus:outline-none"
-                />
+            {/* Email Notification Status & Manual Actions */}
+            <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-lg space-y-2 text-xs">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div className="flex items-center gap-2 text-emerald-900 font-medium">
+                  <Mail size={16} className="text-emerald-700 shrink-0" />
+                  <span>
+                    Email Service: <strong className="text-emerald-800">Active</strong> ({selectedLedgerEvent.userEmail})
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setResendNotifyMsg("Sending confirmation email...");
+                      const res = await sendBookingConfirmationEmail({ data: { booking: selectedLedgerEvent } });
+                      if (res.success) {
+                        setResendNotifyMsg(`Event confirmation email sent to ${selectedLedgerEvent.userEmail}`);
+                      } else {
+                        setResendNotifyMsg(`Failed to send email: ${res.error || "Check SMTP settings"}`);
+                      }
+                      setTimeout(() => setResendNotifyMsg(""), 4000);
+                    }}
+                    className="text-[11px] bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-2.5 py-1 rounded transition-colors cursor-pointer"
+                  >
+                    Resend Event Email
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setResendNotifyMsg("Sending Event Check-In email...");
+                      const res = await sendCheckInEmail({ data: { booking: selectedLedgerEvent } });
+                      if (res.success) {
+                        setResendNotifyMsg(`Event Check-In email sent to ${selectedLedgerEvent.userEmail}`);
+                      } else {
+                        setResendNotifyMsg(`Failed to send email: ${res.error || "Check SMTP settings"}`);
+                      }
+                      setTimeout(() => setResendNotifyMsg(""), 4000);
+                    }}
+                    className="text-[11px] bg-teal-700 hover:bg-teal-800 text-white font-semibold px-2.5 py-1 rounded transition-colors cursor-pointer"
+                  >
+                    Send Check-In Email
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setResendNotifyMsg("Sending Event Check-Out email...");
+                      const res = await sendCheckOutEmail({ data: { booking: selectedLedgerEvent } });
+                      if (res.success) {
+                        setResendNotifyMsg(`Event Check-Out email sent to ${selectedLedgerEvent.userEmail}`);
+                      } else {
+                        setResendNotifyMsg(`Failed to send email: ${res.error || "Check SMTP settings"}`);
+                      }
+                      setTimeout(() => setResendNotifyMsg(""), 4000);
+                    }}
+                    className="text-[11px] bg-blue-700 hover:bg-blue-800 text-white font-semibold px-2.5 py-1 rounded transition-colors cursor-pointer"
+                  >
+                    Send Check-Out Email
+                  </button>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={handleAddPaymentRecord}
-                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-semibold py-2 text-xs rounded uppercase tracking-wider transition-colors cursor-pointer"
-              >
-                + Add Payment Entry
-              </button>
-              {payMsg && <p className="text-xs text-center text-emerald-800 font-medium">{payMsg}</p>}
             </div>
 
-            <div className="space-y-2 border-t border-border pt-3">
-              <span className="text-xs font-bold text-charcoal block">Add Extra Charge / Custom Services:</span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <input
-                  type="number"
-                  placeholder="Amount (₹)"
-                  value={extraAmount}
-                  onChange={(e) => setExtraAmount(e.target.value)}
-                  className="bg-white border border-border px-3 py-1.5 text-xs font-mono focus:border-[color:var(--gold)] focus:outline-none"
-                />
-                <input
-                  type="text"
-                  placeholder="Reason (e.g. Sound System & DJ)"
-                  value={extraReason}
-                  onChange={(e) => setExtraReason(e.target.value)}
-                  className="bg-white border border-border px-3 py-1.5 text-xs focus:border-[color:var(--gold)] focus:outline-none"
-                />
+            {resendNotifyMsg && (
+              <div className="text-xs text-emerald-800 bg-emerald-100 p-2.5 rounded border border-emerald-300 animate-fade-in">
+                {resendNotifyMsg}
               </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex justify-between items-center pt-2 border-t border-border">
               <button
-                type="button"
-                onClick={handleAddExtraChargeRecord}
-                className="w-full bg-amber-700 hover:bg-amber-800 text-white font-semibold py-2 text-xs rounded uppercase tracking-wider transition-colors cursor-pointer"
+                onClick={() => {
+                  onViewBill(selectedLedgerEvent);
+                }}
+                className="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold uppercase tracking-wider px-4 py-2 rounded transition-colors cursor-pointer"
               >
-                + Add Extra Charge
+                <FileText size={14} /> View / Print / Email Event Tax Invoice
               </button>
-              {extraMsg && <p className="text-xs text-center text-amber-800 font-medium">{extraMsg}</p>}
+
+              <button
+                onClick={() => {
+                  setSelectedLedgerEvent(null);
+                  setPayMsg("");
+                  setExtraMsg("");
+                }}
+                className="px-4 py-2 text-xs font-semibold uppercase tracking-wider border border-border text-charcoal hover:bg-sand/30 cursor-pointer"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      <div className="bg-card border border-border/60 shadow-lg p-6 md:p-8">
+      <div className="bg-card border border-border/60 shadow-lg p-6 md:p-8 print:hidden">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h4 className="font-serif text-xl text-[color:var(--forest)]">Active Events</h4>
           <div className="flex items-center gap-2">
@@ -4238,7 +5269,7 @@ function EventsManager({
         </div>
       </div>
 
-      <div className="bg-card border border-border/60 shadow-lg p-6 md:p-8">
+      <div className="bg-card border border-border/60 shadow-lg p-6 md:p-8 print:hidden">
         <h4 className="font-serif text-xl text-[color:var(--forest)] mb-2">
           Client Event &amp; Function Hall Bookings
         </h4>
@@ -4278,13 +5309,32 @@ function EventsManager({
 
                   return (
                     <tr key={eb.id} className="hover:bg-[color:var(--sand)]/10">
-                      <td className="p-4 font-mono font-bold text-[color:var(--forest)]">{eb.id}</td>
+                      <td className="p-4 font-mono font-bold text-[color:var(--forest)]">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedLedgerEvent(eb)}
+                          className="hover:underline text-[color:var(--forest)] font-mono font-bold text-left cursor-pointer flex items-center gap-1"
+                          title="View Member & Event Profile Details"
+                        >
+                          <UserIcon size={12} className="text-gold shrink-0" />
+                          {eb.id}
+                        </button>
+                      </td>
                       <td className="p-4">
-                        <div className="font-medium text-charcoal">{eb.userName}</div>
-                        <div className="text-[10px] text-charcoal/60">{eb.userEmail}</div>
-                        {eb.guestDetails?.mobile && (
-                          <div className="text-[10px] text-charcoal/50">{eb.guestDetails.mobile}</div>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedLedgerEvent(eb)}
+                          className="text-left group cursor-pointer"
+                          title="Click to open Event Guest Profile"
+                        >
+                          <div className="font-bold text-charcoal group-hover:text-[color:var(--forest)] group-hover:underline">
+                            {eb.userName}
+                          </div>
+                          <div className="text-[10px] text-charcoal/60">{eb.userEmail}</div>
+                          {eb.guestDetails?.mobile && (
+                            <div className="text-[10px] text-charcoal/50">{eb.guestDetails.mobile}</div>
+                          )}
+                        </button>
                       </td>
                       <td className="p-4">
                         <div className="font-semibold text-[color:var(--forest)]">
@@ -4325,6 +5375,14 @@ function EventsManager({
                         )}
                       </td>
                       <td className="p-4 text-right space-x-1.5 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedLedgerEvent(eb)}
+                          className="px-2.5 py-1 bg-[color:var(--forest)] hover:bg-[color:var(--forest-deep)] text-white text-[10px] font-bold uppercase tracking-wider rounded-xs transition-colors inline-flex items-center gap-1 cursor-pointer"
+                          title="View Event Member Profile & Operations"
+                        >
+                          <UserIcon size={11} className="text-gold" /> PROFILE
+                        </button>
                         {(eb.status === "pending" || eb.status === "confirmed") && (
                           <button
                             type="button"
@@ -4355,8 +5413,8 @@ function EventsManager({
                         </button>
                         <button
                           type="button"
-                          onClick={() => onViewBill(eb)}
-                          className="px-2 py-1 bg-[color:var(--forest)] hover:bg-[color:var(--gold)] hover:text-black text-ivory text-[10px] font-semibold uppercase tracking-wider rounded-xs transition-colors inline-flex items-center gap-1"
+                          onClick={() => setInvoiceBooking(eb)}
+                          className="px-2 py-1 bg-emerald-800 hover:bg-emerald-900 text-white text-[10px] font-semibold uppercase tracking-wider rounded-xs transition-colors inline-flex items-center gap-1"
                           title="Download Tax Invoice Bill PDF"
                         >
                           <FileText size={11} /> Bill Invoice
@@ -4604,13 +5662,23 @@ function ClientDashboard({
                         <div className="text-xs text-charcoal/80 space-y-1">
                           <div>
                             <span className="font-semibold text-charcoal">Dates:</span>{" "}
-                            {format(parseISO(b.checkIn), "MMM dd")} Ã¢â‚¬â€œ{" "}
+                            {format(parseISO(b.checkIn), "MMM dd")} to{" "}
                             {format(parseISO(b.checkOut), "MMM dd, yyyy")} (
                             {differenceInDays(parseISO(b.checkOut), parseISO(b.checkIn))} nights)
                           </div>
                           <div>
                             <span className="font-semibold text-charcoal">Room:</span>{" "}
-                            <span className="capitalize">{b.roomTypeSlug.replace("-", " ")}</span>
+                            <span className="font-medium text-[color:var(--forest)]">
+                              {(() => {
+                                const assignedRoom = rooms.find((r) => r.id === b.roomId || r.name === b.roomId);
+                                const roomTypeName = ROOMS.find((r) => r.slug === b.roomTypeSlug)?.name || b.roomTypeSlug.replace(/-/g, " ");
+                                return assignedRoom
+                                  ? `${assignedRoom.name} (${roomTypeName})`
+                                  : b.roomId
+                                    ? `${b.roomId} (${roomTypeName})`
+                                    : roomTypeName;
+                              })()}
+                            </span>
                           </div>
                           <div>
                             <span className="font-semibold text-charcoal">Guests:</span> {b.adults}{" "}

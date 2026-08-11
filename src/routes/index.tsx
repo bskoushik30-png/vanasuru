@@ -20,7 +20,7 @@ function Index() {
   return (
     <SiteShell>
       <PageHero
-        image="/images/Gemini_Generated_Image_f81x9ef81x9ef81x.png"
+        image="/images/uploads/DSC05342.JPG"
         eyebrow="VANASURU Hospitality"
         title={
           <>

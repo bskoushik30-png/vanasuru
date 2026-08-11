@@ -1,4 +1,4 @@
-﻿import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useBookingStore, extractMapEmbedUrl } from "@/lib/booking-store";
 import { PROPERTIES, FUNCTION_HALLS } from "@/lib/site-data";
@@ -72,10 +72,6 @@ function CreateEventPage() {
       setErrorMsg("Please enter an event title");
       return;
     }
-    if (!date) {
-      setErrorMsg("Please select an event date");
-      return;
-    }
 
     try {
       let finalImage = image;
@@ -96,7 +92,7 @@ function CreateEventPage() {
         description: description.trim() || "Exclusive event and celebration hosted at VANASURU.",
         property,
         venue,
-        date,
+        date: date || "Available Daily",
         capacity: parseInt(capacity, 10) || 100,
         price: parseFloat(price) || 0,
         image:
@@ -248,20 +244,7 @@ function CreateEventPage() {
                 </label>
               </div>
 
-              <div>
-                <label className="block">
-                  <div className="text-[10px] tracking-[0.28em] uppercase text-charcoal/70 font-semibold mb-2 flex items-center gap-1.5">
-                    <Calendar size={12} className="text-[color:var(--gold)]" /> Event Date *
-                  </div>
-                  <input
-                    type="date"
-                    required
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full bg-transparent border border-border focus:border-[color:var(--gold)] focus:outline-none px-4 py-3 text-sm"
-                  />
-                </label>
-              </div>
+
 
               <div>
                 <label className="block">

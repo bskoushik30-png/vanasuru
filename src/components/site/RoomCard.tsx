@@ -15,6 +15,7 @@ export type DisplayRoom = {
   bed?: string;
   amenities?: string[];
   price?: string;
+  pricePerNight?: number;
   advanceAmount?: number;
   maxGuests?: number;
   maxAdults?: number;
@@ -43,11 +44,19 @@ export function RoomCard({
         ? room.image
         : "/images/DSC05333.JPG.jpeg";
 
-  const targetLink = redirectTo || "/rooms";
+  const targetLink = redirectTo || "/book";
+  const searchObj = redirectTo
+    ? undefined
+    : ({
+        property: room.property || searchParams?.property || "mysore",
+        room: room.slug,
+        checkIn: searchParams?.checkIn,
+        checkOut: searchParams?.checkOut,
+      } as never);
 
   return (
     <article className="group bg-card border border-border/60 overflow-hidden flex flex-col shadow-md hover:shadow-xl transition-shadow duration-300">
-      <Link to={targetLink} className="relative aspect-[4/3] overflow-hidden bg-charcoal/5 block">
+      <Link to={targetLink} search={searchObj} className="relative aspect-[4/3] overflow-hidden bg-charcoal/5 block">
         <OptimizedImage
           src={displayImage}
           alt={room.name}
@@ -69,7 +78,7 @@ export function RoomCard({
       <div className="p-6 flex flex-col flex-1">
         <div className="flex justify-between items-start gap-2">
           <h3 className="font-serif text-2xl text-[color:var(--forest)] font-bold">
-            <Link to={targetLink} className="hover:text-[color:var(--gold)] transition-colors">
+            <Link to={targetLink} search={searchObj} className="hover:text-[color:var(--gold)] transition-colors">
               {room.name}
             </Link>
           </h3>
@@ -104,31 +113,29 @@ export function RoomCard({
           </div>
         )}
         <div
-          className={`mt-6 flex items-center ${hidePrice ? "justify-end" : "justify-between"} border-t border-border/60 pt-4`}
+          className={`mt-6 flex items-center ${hidePrice ? "justify-end" : "justify-between"} border-t border-border/60 pt-4 gap-2`}
         >
           {!hidePrice && (
-            <div>
-              <div className="text-[9px] tracking-[0.2em] uppercase text-charcoal/50">
-                {room.price ? "Starting" : "Advance Required"}
+            <div className="flex flex-col gap-1">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[10px] tracking-wider uppercase text-charcoal/60 font-bold">Room Tariff:</span>
+                <span className="font-serif text-lg font-bold text-[color:var(--forest)]">
+                  {room.pricePerNight
+                    ? `₹${room.pricePerNight.toLocaleString("en-IN")}`
+                    : room.price || "₹3,500"}
+                </span>
+                <span className="text-[11px] font-sans text-charcoal/60 font-normal">/ night</span>
               </div>
-              <div className="font-serif text-base font-bold text-[color:var(--forest)]">
-                {room.price || `₹${(room.advanceAmount ?? 10).toLocaleString("en-IN")}`}
+              <div className="text-[11px] font-semibold text-emerald-800 flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 w-fit">
+                <Tag size={12} className="text-[color:var(--gold)]" />
+                <span>Reserve with <strong className="text-[color:var(--forest-deep)]">₹{(room.advanceAmount ?? 1).toLocaleString("en-IN")} advance</strong></span>
               </div>
             </div>
           )}
           <Link
             to={targetLink}
-            search={
-              redirectTo
-                ? undefined
-                : ({
-                    room: room.slug,
-                    property: room.property || searchParams?.property,
-                    checkIn: searchParams?.checkIn,
-                    checkOut: searchParams?.checkOut,
-                  } as never)
-            }
-            className="text-[10px] tracking-[0.24em] uppercase font-semibold text-[color:var(--gold)] border-b border-[color:var(--gold)] pb-0.5 hover:text-[color:var(--forest)] hover:border-[color:var(--forest)] transition-colors"
+            search={searchObj}
+            className="text-[10px] tracking-[0.24em] uppercase font-semibold text-[color:var(--gold)] border-b border-[color:var(--gold)] pb-0.5 hover:text-[color:var(--forest)] hover:border-[color:var(--forest)] transition-colors shrink-0"
           >
             Book Room
           </Link>

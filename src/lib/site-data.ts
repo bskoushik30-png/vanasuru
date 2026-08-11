@@ -9,6 +9,25 @@ export const BRAND = {
 
 export type PropertyKey = string;
 
+export function isPropertyMatch(roomProp: string, targetProp: string): boolean {
+  if (!roomProp || !targetProp) return false;
+  const r = roomProp.toLowerCase().trim();
+  const t = targetProp.toLowerCase().trim();
+  if (r === t) return true;
+  if (r.includes(t) || t.includes(r)) return true;
+  if (
+    (r.includes("mysore") || r.includes("silverleaf")) &&
+    (t.includes("mysore") || t.includes("silverleaf"))
+  )
+    return true;
+  if (
+    (r.includes("mahadevapura") || r.includes("village")) &&
+    (t.includes("mahadevapura") || t.includes("village"))
+  )
+    return true;
+  return false;
+}
+
 export type PropertyInfo = {
   key: PropertyKey;
   name: string;

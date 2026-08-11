@@ -546,10 +546,10 @@ function BookPage() {
                           className={inp}
                         >
                           {availableRoomIds.map((id) => {
-                            const roomObj = PHYSICAL_ROOMS.find((r) => r.id === id);
+                            const roomObj = rooms.find((r) => r.id === id) || PHYSICAL_ROOMS.find((r) => r.id === id);
                             return (
                               <option key={id} value={id}>
-                                {roomObj ? roomObj.name : id}
+                                {roomObj ? `${roomObj.name}` : id}
                               </option>
                             );
                           })}

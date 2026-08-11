@@ -12,6 +12,12 @@ import {
   deleteBookingDb,
   deleteAllBookingsDb,
 } from "./booking-api";
+import {
+  sendBookingConfirmationEmail,
+  sendCheckInEmail,
+  sendCheckOutEmail,
+} from "./email-api";
+import { isPropertyMatch } from "./site-data";
 
 export interface User {
   id: string;
@@ -189,7 +195,7 @@ const DEFAULT_PHYSICAL_ROOMS: PhysicalRoom[] = [
     property: "mysore",
     roomTypeSlug: "deluxe-room",
     advanceAmount: 1,
-    pricePerNight: 3500,
+    pricePerNight: 7000,
   },
   {
     id: "RM102",
@@ -197,7 +203,7 @@ const DEFAULT_PHYSICAL_ROOMS: PhysicalRoom[] = [
     property: "mysore",
     roomTypeSlug: "premium-suite",
     advanceAmount: 1,
-    pricePerNight: 6500,
+    pricePerNight: 9500,
   },
   {
     id: "RM103",
@@ -205,7 +211,7 @@ const DEFAULT_PHYSICAL_ROOMS: PhysicalRoom[] = [
     property: "mysore",
     roomTypeSlug: "family-villa",
     advanceAmount: 1,
-    pricePerNight: 8500,
+    pricePerNight: 14500,
   },
   {
     id: "RM104",
@@ -213,7 +219,7 @@ const DEFAULT_PHYSICAL_ROOMS: PhysicalRoom[] = [
     property: "mysore",
     roomTypeSlug: "deluxe-room",
     advanceAmount: 1,
-    pricePerNight: 3500,
+    pricePerNight: 7000,
   },
   {
     id: "RM201",
@@ -953,6 +959,7 @@ class Store {
           property: room.property,
           room_type_slug: room.roomTypeSlug,
           advance_amount: room.advanceAmount ?? 1,
+          price_per_night: room.pricePerNight ?? 7000,
           photos: room.photos ?? [],
           max_guests: room.maxGuests ?? 4,
           max_adults: room.maxAdults ?? 2,
@@ -1125,14 +1132,18 @@ class Store {
     checkIn: string,
     checkOut: string,
   ): { roomTypeSlug: string; availableCount: number; availableRoomIds: string[] }[] {
+    const allRooms = this.rooms && this.rooms.length > 0 ? this.rooms : PHYSICAL_ROOMS;
+
     if (!checkIn || !checkOut) {
       // If dates are not set, return all rooms as available
       const counts: Record<string, { count: number; ids: string[] }> = {};
-      PHYSICAL_ROOMS.filter((r) => r.property === property).forEach((r) => {
-        if (!counts[r.roomTypeSlug]) counts[r.roomTypeSlug] = { count: 0, ids: [] };
-        counts[r.roomTypeSlug].count++;
-        counts[r.roomTypeSlug].ids.push(r.id);
-      });
+      allRooms
+        .filter((r) => isPropertyMatch(r.property, property))
+        .forEach((r) => {
+          if (!counts[r.roomTypeSlug]) counts[r.roomTypeSlug] = { count: 0, ids: [] };
+          counts[r.roomTypeSlug].count++;
+          counts[r.roomTypeSlug].ids.push(r.id);
+        });
       return Object.entries(counts).map(([slug, val]) => ({
         roomTypeSlug: slug,
         availableCount: val.count,
@@ -1156,14 +1167,13 @@ class Store {
       if (b.status === "cancelled") return false;
       const bIn = new Date(b.checkIn);
       const bOut = new Date(b.checkOut);
-      // Overlap condition: (StartA < EndB) and (EndA > StartB)
       return checkInDate < bOut && checkOutDate > bIn;
     });
 
     const bookedRoomIds = new Set(overlappingBookings.map((b) => b.roomId));
 
     // Calculate availability for each room type at this property
-    const propertyRooms = PHYSICAL_ROOMS.filter((r) => r.property === property);
+    const propertyRooms = allRooms.filter((r) => isPropertyMatch(r.property, property));
 
     const availabilityMap: Record<string, { count: number; ids: string[] }> = {};
 
@@ -1249,6 +1259,9 @@ class Store {
       });
       this.save();
       void syncBookingDb({ data: { booking } }).catch(() => {});
+      void sendCheckInEmail({ data: { booking } }).catch((err) => {
+        console.error("Failed to send check-in email:", err);
+      });
       return { success: true, booking };
     }
     return { success: false, error: "Booking not found" };
@@ -1264,6 +1277,9 @@ class Store {
       });
       this.save();
       void syncBookingDb({ data: { booking } }).catch(() => {});
+      void sendCheckOutEmail({ data: { booking } }).catch((err) => {
+        console.error("Failed to send check-out email:", err);
+      });
       return { success: true, booking };
     }
     return { success: false, error: "Booking not found" };
@@ -1409,6 +1425,10 @@ class Store {
 
     this.bookings.unshift(newBooking);
     this.save();
+    void syncBookingDb({ data: { booking: newBooking } }).catch(() => {});
+    void sendBookingConfirmationEmail({ data: { booking: newBooking } }).catch((err) => {
+      console.error("Failed to send admin booking confirmation email:", err);
+    });
     return { success: true, booking: newBooking };
   }
 
@@ -1441,6 +1461,9 @@ class Store {
   recordVerifiedBooking(booking: Booking) {
     this.bookings = [booking, ...this.bookings.filter((existing) => existing.id !== booking.id)];
     this.save();
+    void sendBookingConfirmationEmail({ data: { booking } }).catch((err) => {
+      console.warn("Failed to send booking confirmation email:", err);
+    });
     return true;
   }
 

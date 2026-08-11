@@ -3,9 +3,10 @@ import { z } from "zod";
 import fs from "node:fs";
 import path from "node:path";
 import { supabase } from "./supabase";
-import { PROPERTIES, ROOMS } from "./site-data";
+import { PROPERTIES, ROOMS, isPropertyMatch } from "./site-data";
 import type { PropertyKey } from "./site-data";
 import type { Booking, CreateBookingInput, User } from "./booking-store";
+import { sendBookingConfirmationEmail } from "./email-api";
 
 export const ADVANCE_AMOUNT_RUPEES = 1;
 export const ADVANCE_AMOUNT_PAISE = ADVANCE_AMOUNT_RUPEES * 100;
@@ -165,14 +166,51 @@ async function getStoredBookings(): Promise<Booking[]> {
   return (data as SupabaseBookingRow[]).map(fromSupabaseBooking);
 }
 
+const OPTIONAL_BOOKING_COLUMNS = [
+  "checked_in_at",
+  "checked_out_at",
+  "payments_history",
+  "extra_charges",
+  "custom_grand_total",
+  "email_notified",
+  "payment",
+];
+
 async function persistBooking(booking: Booking) {
-  const { error } = await supabase.from("bookings").upsert(toSupabaseBooking(booking));
-  if (error) {
-    console.warn("Supabase booking insert failed, keeping booking in memory.", error.message);
-    serverBookings.push(booking);
-    return;
+  const currentPayload = { ...toSupabaseBooking(booking) } as Record<string, unknown>;
+
+  while (true) {
+    const { error } = await supabase.from("bookings").upsert(currentPayload);
+    if (!error) {
+      serverBookings.push(booking);
+      return;
+    }
+
+    const errMsg = (error.message || "").toLowerCase();
+    let strippedAny = false;
+
+    for (const col of OPTIONAL_BOOKING_COLUMNS) {
+      if (col in currentPayload && errMsg.includes(col)) {
+        delete currentPayload[col];
+        strippedAny = true;
+      }
+    }
+
+    if (!strippedAny && (errMsg.includes("schema cache") || errMsg.includes("column"))) {
+      for (const col of OPTIONAL_BOOKING_COLUMNS) {
+        if (col in currentPayload) {
+          delete currentPayload[col];
+          strippedAny = true;
+        }
+      }
+    }
+
+    if (!strippedAny) {
+      console.warn("Supabase booking insert note:", error.message);
+      serverBookings.push(booking);
+      return;
+    }
   }
-  serverBookings.push(booking);
 }
 
 function fromSupabaseBooking(row: SupabaseBookingRow): Booking {
@@ -298,7 +336,7 @@ async function checkServerAvailability(
       : PHYSICAL_ROOMS;
 
   if (!checkIn || !checkOut) {
-    return mapAvailableRooms(activeRooms.filter((room) => room.property === property));
+    return mapAvailableRooms(activeRooms.filter((room) => isPropertyMatch(room.property, property)));
   }
 
   const checkInDate = new Date(checkIn);
@@ -316,7 +354,7 @@ async function checkServerAvailability(
 
   const bookedRoomIds = new Set(overlappingBookings.map((booking) => booking.roomId));
   const availableRooms = activeRooms.filter(
-    (room) => room.property === property && !bookedRoomIds.has(room.id),
+    (room) => isPropertyMatch(room.property, property) && !bookedRoomIds.has(room.id),
   );
 
   return mapAvailableRooms(availableRooms);
@@ -531,6 +569,12 @@ export const verifyAdvancePayment = createServerFn({ method: "POST" })
 
     await persistBooking(booking);
     pendingOrders.delete(data.razorpay_order_id);
+
+    // Send confirmation emails to guest and admin
+    void sendBookingConfirmationEmail({ data: { booking } }).catch((err) => {
+      console.error("Failed to send online booking confirmation email:", err);
+    });
+
     return { booking };
   });
 
