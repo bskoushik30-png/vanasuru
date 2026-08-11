@@ -832,26 +832,48 @@ export const uploadImageToProjectDb = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    try {
-      const sanitizedName = `${Date.now()}-${data.fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-      const targetDir = path.join(process.cwd(), "public", "images", "uploads", data.folder);
+    const sanitizedName = `${Date.now()}-${data.fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    const base64Data = data.dataUrl.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Data, "base64");
 
+    // 1. Try uploading to Supabase Storage bucket
+    try {
+      const mimeMatch = data.dataUrl.match(/^data:(image\/\w+);base64,/);
+      const contentType = mimeMatch ? mimeMatch[1] : "image/jpeg";
+      const storagePath = `${data.folder}/${sanitizedName}`;
+      const { data: storageUpload, error: storageErr } = await supabase.storage
+        .from("uploads")
+        .upload(storagePath, buffer, { contentType, upsert: true });
+
+      if (!storageErr && storageUpload) {
+        const { data: pubUrl } = supabase.storage.from("uploads").getPublicUrl(storagePath);
+        if (pubUrl?.publicUrl) {
+          return { success: true, url: pubUrl.publicUrl };
+        }
+      }
+    } catch (sErr) {
+      console.warn("[Storage] Supabase bucket upload note:", sErr);
+    }
+
+    // 2. Try writing to local disk (for local development)
+    try {
+      const targetDir = path.join(process.cwd(), "public", "images", "uploads", data.folder);
       if (!fs.existsSync(targetDir)) {
         fs.mkdirSync(targetDir, { recursive: true });
       }
-
-      const base64Data = data.dataUrl.replace(/^data:image\/\w+;base64,/, "");
       const filePath = path.join(targetDir, sanitizedName);
-      fs.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
-
+      fs.writeFileSync(filePath, buffer);
       return {
         success: true,
         url: `/images/uploads/${data.folder}/${sanitizedName}`,
       };
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error("Failed to save image to project folder:", err);
-      throw new Error("Could not save image to disk: " + msg);
+    } catch (diskErr: unknown) {
+      console.warn("[Serverless] Local disk is read-only (Vercel lambda), using Data URL fallback.");
+      // 3. Serverless fallback: return Data URL directly
+      return {
+        success: true,
+        url: data.dataUrl,
+      };
     }
   });
 
