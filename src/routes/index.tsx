@@ -59,7 +59,7 @@ function Index() {
               Two destinations, <em className="italic text-[color:var(--gold)]">one soul</em>.
             </>
           }
-          intro="VANASURU began as a promise â€” that hospitality could be quieter, more considered, and more rooted in the land. From heritage gardens in Mysore to a contemporary retreat in Bengaluru, we shape stays that feel like coming home to something older and finer."
+          intro="VANASURU began as a promise — that hospitality could be quieter, more considered, and more rooted in the land. From heritage gardens in Mysore to a contemporary retreat in Bengaluru, we shape stays that feel like coming home to something older and finer."
         />
       </section>
 
@@ -97,7 +97,7 @@ function Index() {
         <SectionHeading
           eyebrow="Rooms & Suites"
           title="Rooms shaped for slow days."
-          intro="From forest-facing suites to airy family villas â€” every room is a considered retreat."
+          intro="From forest-facing suites to airy family villas — every room is a considered retreat."
         />
         <div className="mt-16 mx-auto max-w-7xl grid gap-8 md:grid-cols-2 lg:grid-cols-4">
           {ROOMS.map((r) => (
@@ -119,7 +119,7 @@ function Index() {
         <SectionHeading
           eyebrow="Experiences"
           title="Curated with quiet intention."
-          intro="From farm-to-table dining to spa rituals and forest walks Ã¢â‚¬â€ indulgence, softly delivered."
+          intro="From farm-to-table dining to spa rituals and forest walks — indulgence, softly delivered."
         />
         <div className="mt-16 mx-auto max-w-6xl grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-y-12 gap-x-6">
           {EXPERIENCES.slice(0, 10).map((e) => (

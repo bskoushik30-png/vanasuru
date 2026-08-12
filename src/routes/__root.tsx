@@ -1,4 +1,4 @@
-﻿import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
@@ -78,14 +78,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "VANASURU â€” Two Destinations. One Unforgettable Stay." },
+      { title: "VANASURU — Two Destinations. One Unforgettable Stay." },
       {
         name: "description",
         content:
-          "VANASURU is a luxury nature retreat with two destinations â€” Mysore and Mahadevapura. Escape into forest-green calm, refined interiors, and unhurried hospitality.",
+          "VANASURU is a luxury nature retreat with two destinations — Mysore and Mahadevapura. Escape into forest-green calm, refined interiors, and unhurried hospitality.",
       },
       { name: "author", content: "VANASURU" },
-      { property: "og:title", content: "VANASURU â€” Luxury Resort Retreats" },
+      { property: "og:title", content: "VANASURU — Luxury Resort Retreats" },
       { property: "og:description", content: "Two destinations. One unforgettable stay." },
       { property: "og:image", content: "/images/logo.png" },
       { property: "og:type", content: "website" },

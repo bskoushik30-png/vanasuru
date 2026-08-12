@@ -1,4 +1,4 @@
-﻿import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { SiteShell } from "@/components/site/SiteShell";
 import { PageHero } from "@/components/site/PageHero";
 import { SectionHeading } from "@/components/site/SectionHeading";
@@ -9,7 +9,7 @@ import { Leaf, HeartHandshake, Sparkles, Compass } from "lucide-react";
 export const Route = createFileRoute("/about")({
   head: () => ({
     meta: [
-      { title: "About VANASURU â€” A Story of Two Retreats" },
+      { title: "About VANASURU — A Story of Two Retreats" },
       {
         name: "description",
         content:
@@ -36,7 +36,7 @@ const VALUES = [
   {
     icon: Sparkles,
     title: "Considered Design",
-    blurb: "Interiors that whisper rather than shout â€” layered, tactile, and calm.",
+    blurb: "Interiors that whisper rather than shout — layered, tactile, and calm.",
   },
   {
     icon: Compass,
@@ -75,7 +75,7 @@ function About() {
         image="/images/Gemini_Generated_Image_v6somfv6somfv6so.png"
         eyebrow="Our Story"
         title="A quieter way to travel."
-        intro="VANASURU is a family of two considered retreats â€” built on the belief that hospitality can be soft, rooted, and deeply human."
+        intro="VANASURU is a family of two considered retreats — built on the belief that hospitality can be soft, rooted, and deeply human."
       />
 
       <section className="py-28 px-6">
@@ -95,7 +95,7 @@ function About() {
                   Hospitality, <em className="italic text-[color:var(--gold)]">rewritten</em>.
                 </>
               }
-              intro="We wanted a place where the noise fell away. Where the light was honest, the food was local, and the people at the front desk actually knew your name by dinner. VANASURU is our answer â€” a small collection of retreats built for the guest who wants less, done beautifully."
+              intro="We wanted a place where the noise fell away. Where the light was honest, the food was local, and the people at the front desk actually knew your name by dinner. VANASURU is our answer — a small collection of retreats built for the guest who wants less, done beautifully."
             />
           </div>
         </div>

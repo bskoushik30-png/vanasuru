@@ -1,4 +1,4 @@
-﻿import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { Facebook, Instagram, Youtube, Mail, Phone, MapPin } from "lucide-react";
 import { BRAND, PROPERTIES, NAV_LINKS } from "@/lib/site-data";
 
@@ -45,7 +45,7 @@ export function SiteFooter() {
             </span>
           </Link>
           <p className="mt-6 text-sm leading-relaxed text-ivory/70 max-w-sm">
-            {BRAND.tagline} Slow mornings, refined interiors, and hospitality with a soul â€” across
+            {BRAND.tagline} Slow mornings, refined interiors, and hospitality with a soul — across
             two considered destinations.
           </p>
           <div className="mt-6 flex gap-4 text-ivory/70">

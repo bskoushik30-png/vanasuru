@@ -1,4 +1,4 @@
-﻿import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Phone, Mail, MapPin, CheckCircle2 } from "lucide-react";
 import { SiteShell } from "@/components/site/SiteShell";
@@ -9,9 +9,9 @@ import { PROPERTIES } from "@/lib/site-data";
 export const Route = createFileRoute("/contact")({
   head: () => ({
     meta: [
-      { title: "Contact â€” VANASURU" },
+      { title: "Contact — VANASURU" },
       { name: "description", content: "Reach VANASURU Silverleaf or VANASURU Village." },
-      { property: "og:title", content: "Contact â€” VANASURU" },
+      { property: "og:title", content: "Contact — VANASURU" },
       { property: "og:description", content: "We'd love to hear from you." },
     ],
   }),
@@ -26,7 +26,7 @@ function ContactPage() {
         image="/images/DSC05333.JPG.jpeg"
         eyebrow="Contact"
         title="We'd love to hear from you."
-        intro="Reach either property directly, or send us a note â€” we respond within one working day."
+        intro="Reach either property directly, or send us a note — we respond within one working day."
       />
 
       <section className="py-24 px-6">

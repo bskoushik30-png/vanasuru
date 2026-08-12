@@ -22,13 +22,13 @@ type RoomSearchParams = {
 export const Route = createFileRoute("/rooms")({
   head: () => ({
     meta: [
-      { title: "Rooms & Suites â€” VANASURU" },
+      { title: "Rooms & Suites — VANASURU" },
       {
         name: "description",
         content:
           "Deluxe rooms, premium suites, family villas, and executive rooms across VANASURU's two properties.",
       },
-      { property: "og:title", content: "Rooms & Suites â€” VANASURU" },
+      { property: "og:title", content: "Rooms & Suites — VANASURU" },
       { property: "og:description", content: "Rooms shaped for slow days." },
     ],
   }),
@@ -117,7 +117,7 @@ function RoomsPage() {
         image="/images/DSC_1319 (1).jpg"
         eyebrow="Rooms & Suites"
         title="Rooms shaped for slow days."
-        intro="Every room at VANASURU is a considered retreat â€” layered materials, generous proportions, and the softest linens."
+        intro="Every room at VANASURU is a considered retreat — layered materials, generous proportions, and the softest linens."
       />
 
       {/* Dynamic Date Filter Bar */}

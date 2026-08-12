@@ -22,12 +22,12 @@ import {
 export const Route = createFileRoute("/events")({
   head: () => ({
     meta: [
-      { title: "Events & Celebrations â€” VANASURU" },
+      { title: "Events & Celebrations — VANASURU" },
       {
         name: "description",
         content: "Weddings, engagements, corporate off-sites, and function halls at VANASURU.",
       },
-      { property: "og:title", content: "Events & Celebrations â€” VANASURU" },
+      { property: "og:title", content: "Events & Celebrations — VANASURU" },
       {
         property: "og:description",
         content: "Milestone moments and luxury function halls in serene nature.",
@@ -62,7 +62,7 @@ function EventsPage() {
         image="https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1600&q=75"
         eyebrow="Events & Celebrations"
         title="Once-in-a-lifetime moments."
-        intro="Weddings, engagements, corporate off-sites, and luxury function halls â€” VANASURU holds each occasion with grace."
+        intro="Weddings, engagements, corporate off-sites, and luxury function halls — VANASURU holds each occasion with grace."
       />
 
       {/* Property Switcher Tabs */}

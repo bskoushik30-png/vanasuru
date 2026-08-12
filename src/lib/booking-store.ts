@@ -189,69 +189,12 @@ export type CreateBookingInput = Omit<
   "id" | "userEmail" | "userName" | "roomId" | "status" | "createdAt"
 > & { roomId?: string };
 
-const DEFAULT_PHYSICAL_ROOMS: PhysicalRoom[] = [
-  {
-    id: "RM101",
-    name: "Room 101",
-    property: "mysore",
-    roomTypeSlug: "deluxe-room",
-    advanceAmount: 1,
-    pricePerNight: 7000,
-  },
-  {
-    id: "RM102",
-    name: "Room 102",
-    property: "mysore",
-    roomTypeSlug: "premium-suite",
-    advanceAmount: 1,
-    pricePerNight: 9500,
-  },
-  {
-    id: "RM103",
-    name: "Room 103",
-    property: "mysore",
-    roomTypeSlug: "family-villa",
-    advanceAmount: 1,
-    pricePerNight: 14500,
-  },
-  {
-    id: "RM104",
-    name: "Room 104",
-    property: "mysore",
-    roomTypeSlug: "deluxe-room",
-    advanceAmount: 1,
-    pricePerNight: 7000,
-  },
-  {
-    id: "RM201",
-    name: "Room 201",
-    property: "mahadevapura",
-    roomTypeSlug: "executive-room",
-    advanceAmount: 1,
-    pricePerNight: 4500,
-  },
-  {
-    id: "RM202",
-    name: "Room 202",
-    property: "mahadevapura",
-    roomTypeSlug: "premium-suite",
-    advanceAmount: 1,
-    pricePerNight: 6500,
-  },
-  {
-    id: "RM203",
-    name: "Room 203",
-    property: "mahadevapura",
-    roomTypeSlug: "executive-room",
-    advanceAmount: 1,
-    pricePerNight: 4500,
-  },
-];
+const DEFAULT_PHYSICAL_ROOMS: PhysicalRoom[] = [];
 
 const DEFAULT_LOCATIONS: Location[] = [];
 
-// Dynamic export Ã¢â‚¬â€ reads from the store so existing code continues to work
-export let PHYSICAL_ROOMS: PhysicalRoom[] = [...DEFAULT_PHYSICAL_ROOMS];
+// Dynamic export — reads from the store so existing code continues to work
+export let PHYSICAL_ROOMS: PhysicalRoom[] = [];
 
 const isBrowser = typeof window !== "undefined";
 
@@ -430,7 +373,7 @@ class Store {
 
       this.bookings = mergedBookings.filter((b) => !this.deletedBookingIds.has(b.id));
       this.locations = data.locations && data.locations.length > 0 ? data.locations : this.locations;
-      this.rooms = data.rooms && data.rooms.length > 0 ? data.rooms : this.rooms;
+      this.rooms = data.rooms || [];
       if (data.users && data.users.length > 0) {
         this.users = data.users;
       }
@@ -942,7 +885,7 @@ class Store {
     if (activeBookings.length > 0) {
       return {
         success: false,
-        error: `Cannot delete Ã¢â‚¬â€  ${activeBookings.length} active booking(s) assigned to this room.`,
+        error: `Cannot delete — ${activeBookings.length} active booking(s) assigned to this room.`,
       };
     }
     try {

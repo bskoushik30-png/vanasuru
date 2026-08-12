@@ -78,7 +78,7 @@ function isBookingStatusFilter(value: string): value is BookingStatusFilter {
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
-    meta: [{ title: "Dashboard â€” VANASURU" }],
+    meta: [{ title: "Dashboard — VANASURU" }],
   }),
   component: DashboardPage,
 });
@@ -5502,7 +5502,7 @@ function TimelineRow({
                     {booking.userName.split(" ")[0]}
                   </span>
                 ) : (
-                  <span className="opacity-40 font-mono text-[7px] font-normal">Ã¢â‚¬Â¢</span>
+                  <span className="opacity-40 font-mono text-[7px] font-normal">•</span>
                 )}
               </div>
             </div>
@@ -5734,7 +5734,7 @@ function ClientDashboard({
                       <span className="font-medium text-charcoal/75 capitalize">
                         {b.property}
                       </span>{" "}
-                      Ã¢â‚¬â€{" "}
+                      —{" "}
                       <span className="capitalize text-charcoal/60">
                         {b.roomTypeSlug.replace("-", " ")}
                       </span>

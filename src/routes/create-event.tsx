@@ -22,7 +22,7 @@ import {
 export const Route = createFileRoute("/create-event")({
   head: () => ({
     meta: [
-      { title: "Create Event & Function Hall â€” VANASURU" },
+      { title: "Create Event & Function Hall — VANASURU" },
       {
         name: "description",
         content: "Create and publish new resort events and function hall offerings.",

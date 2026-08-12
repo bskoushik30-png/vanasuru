@@ -1,4 +1,4 @@
-﻿import { Link } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { OptimizedImage } from "./OptimizedImage";
 
 interface BookingCtaProps {
@@ -26,7 +26,7 @@ export function BookingCta({
           Begin the story of your stay.
         </h2>
         <p className="mt-5 text-ivory/75 max-w-xl mx-auto">
-          Enquire with our hospitality team â€” we'll shape a stay around your dates, occasion, and
+          Enquire with our hospitality team — we'll shape a stay around your dates, occasion, and
           every quiet preference.
         </p>
         <div className="mt-10 flex flex-wrap gap-4 justify-center">

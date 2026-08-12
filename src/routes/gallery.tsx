@@ -1,4 +1,4 @@
-﻿import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { SiteShell } from "@/components/site/SiteShell";
 import { PageHero } from "@/components/site/PageHero";
@@ -9,12 +9,12 @@ import { useBookingStore } from "@/lib/booking-store";
 export const Route = createFileRoute("/gallery")({
   head: () => ({
     meta: [
-      { title: "Gallery â€” VANASURU" },
+      { title: "Gallery — VANASURU" },
       {
         name: "description",
-        content: "A world in stillness â€” glimpses across VANASURU's two destinations.",
+        content: "A world in stillness — glimpses across VANASURU's two destinations.",
       },
-      { property: "og:title", content: "Gallery â€” VANASURU" },
+      { property: "og:title", content: "Gallery — VANASURU" },
       { property: "og:description", content: "A world in stillness." },
     ],
   }),
