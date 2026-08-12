@@ -447,9 +447,15 @@ class Store {
     // Load rooms (dynamic physical rooms)
     const storedRooms = localStorage.getItem("vanasuru_rooms");
     if (storedRooms) {
-      this.rooms = JSON.parse(storedRooms) as PhysicalRoom[];
+      try {
+        const loadedRooms = JSON.parse(storedRooms) as PhysicalRoom[];
+        const legacyFakeIds = new Set(["RM101", "RM102", "RM103", "RM104", "RM201", "RM202", "RM203"]);
+        this.rooms = loadedRooms.filter((r) => !legacyFakeIds.has(r.id));
+      } catch {
+        this.rooms = [];
+      }
     } else {
-      this.rooms = [...DEFAULT_PHYSICAL_ROOMS];
+      this.rooms = [];
     }
 
     // Load gallery items from localStorage first (sync)
@@ -1036,7 +1042,7 @@ class Store {
     checkIn: string,
     checkOut: string,
   ): { roomTypeSlug: string; availableCount: number; availableRoomIds: string[] }[] {
-    const allRooms = this.rooms && this.rooms.length > 0 ? this.rooms : PHYSICAL_ROOMS;
+    const allRooms = this.rooms || [];
 
     if (!checkIn || !checkOut) {
       // If dates are not set, return all rooms as available

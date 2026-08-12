@@ -1,4 +1,4 @@
-﻿-- VANASURU Retreat Planner - Complete Production Database Schema
+-- VANASURU Retreat Planner - Complete Production Database Schema
 -- Run this script in your Supabase SQL Editor (https://supabase.com/dashboard/project/_/sql)
 
 -- 1. Create public.users table (Account storage)
@@ -134,25 +134,6 @@ values
   ('loc-mysore', 'mysore', 'VANASURU Silverleaf', 'Vanasuru, 227/9, CFTRI layout, Bogadi 2nd Stage, Bogadi, Mysuru, Karnataka 570022', '+91 78991 79979', 'vanasurumys@gmail.com', 'A serene nature retreat wrapped in gardens and gentle mornings.', 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2753.269961454444!2d76.60362042044873!3d12.298387815407652!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3baf7b7ec30ea817%3A0xf60112f9c3cfbb4c!2sVanasuru!5e0!3m2!1sen!2sin!4v1785132467896!5m2!1sen!2sin'),
   ('loc-mahadevapura', 'mahadevapura', 'VANASURU Village', 'Mahadevapura, Mysuru, Karnataka 571438 (12.3993043, 76.7884710)', '+91 78991 79979', 'vanasurumys@gmail.com', 'Modern luxury for business, celebrations, and the city''s finer moments.', 'https://www.google.com/maps/embed?pb=!1m17!1m12!1m3!1d3896.755266672102!2d76.7859033750668!3d12.39930998786595!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMTLCsDIzJzU3LjUiTiA3NsKwNDcnMTguNSJF!5e0!3m2!1sen!2sin!4v1785132548332!5m2!1sen!2sin')
 on conflict (key) do nothing;
-
--- Seed default rooms
-insert into public.rooms (id, name, property, room_type_slug, advance_amount)
-values
-  ('RM101', 'Room 101', 'mysore', 'deluxe-room', 1000),
-  ('RM102', 'Room 102', 'mysore', 'premium-suite', 1000),
-  ('RM103', 'Room 103', 'mysore', 'family-villa', 1000),
-  ('RM104', 'Room 104', 'mysore', 'deluxe-room', 1000),
-  ('RM201', 'Room 201', 'mahadevapura', 'executive-room', 1000),
-  ('RM202', 'Room 202', 'mahadevapura', 'premium-suite', 1000),
-  ('RM203', 'Room 203', 'mahadevapura', 'executive-room', 1000)
-on conflict (id) do nothing;
-
--- Seed default events
-insert into public.events (id, title, description, property, venue, date, capacity, price, image, is_highlighted)
-values
-  ('evt-1', 'Royal Heritage Wedding Gala', 'Grand wedding celebrations on our manicured heritage lawns with full banquet catering and floral decor.', 'mysore', 'Heritage Gardens & Lawns', '2026-11-15', 350, 150000, 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=75', true),
-  ('evt-2', 'Monsoon Sunset Symphony & Dinner', 'An exclusive acoustic music evening paired with fine farm-to-table dining under the stars.', 'mysore', 'Courtyard & Dining Pavilion', '2026-09-20', 120, 3500, 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=1200&q=75', true),
-  ('evt-3', 'Executive Leadership Summit 2026', 'A corporate retreat for executive teams featuring state-of-the-art conference facilities and wellness breaks.', 'mahadevapura', 'Grand Ballroom & Conference Suite', '2026-10-05', 200, 85000, 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=75', true)
 
 -- Migration statements for dynamic room columns
 ALTER TABLE public.rooms ADD COLUMN IF NOT EXISTS advance_amount numeric not null default 1000;

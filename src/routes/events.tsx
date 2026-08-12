@@ -231,56 +231,58 @@ function EventsPage() {
       </section>
 
       {/* Function Halls in Vicinity */}
-      <section className="py-24 px-6 bg-[color:var(--sand)]/40">
-        <div className="mx-auto max-w-7xl">
-          <SectionHeading
-            eyebrow="Vicinity Venues"
-            title={`Function Halls at ${activeLocation.name}`}
-            intro="Air-conditioned ballrooms, heritage green lawns, and outdoor pavilions equipped for celebrations."
-          />
+      {propertyHalls.length > 0 && (
+        <section className="py-24 px-6 bg-[color:var(--sand)]/40">
+          <div className="mx-auto max-w-7xl">
+            <SectionHeading
+              eyebrow="Vicinity Venues"
+              title={`Function Halls at ${activeLocation.name}`}
+              intro="Air-conditioned ballrooms, heritage green lawns, and outdoor pavilions equipped for celebrations."
+            />
 
-          <div className="mt-14 grid gap-8 md:grid-cols-2">
-            {propertyHalls.map((hall) => (
-              <div
-                key={hall.id}
-                className="bg-card border border-border/60 overflow-hidden flex flex-col md:flex-row hover:shadow-lg transition-shadow"
-              >
-                <div className="md:w-1/2 relative h-64 md:h-auto">
-                  <img src={hall.image} alt={hall.name} className="w-full h-full object-cover" />
-                  <div className="absolute top-4 left-4 bg-[color:var(--forest-deep)]/90 text-ivory text-[9px] font-bold tracking-widest uppercase px-3 py-1">
-                    {hall.capacity}
+            <div className="mt-14 grid gap-8 md:grid-cols-2">
+              {propertyHalls.map((hall) => (
+                <div
+                  key={hall.id}
+                  className="bg-card border border-border/60 overflow-hidden flex flex-col md:flex-row hover:shadow-lg transition-shadow"
+                >
+                  <div className="md:w-1/2 relative h-64 md:h-auto">
+                    <img src={hall.image} alt={hall.name} className="w-full h-full object-cover" />
+                    <div className="absolute top-4 left-4 bg-[color:var(--forest-deep)]/90 text-ivory text-[9px] font-bold tracking-widest uppercase px-3 py-1">
+                      {hall.capacity}
+                    </div>
+                  </div>
+                  <div className="md:w-1/2 p-6 md:p-8 flex flex-col justify-between">
+                    <div>
+                      <h3 className="font-serif text-2xl text-[color:var(--forest)] font-bold mb-2">
+                        {hall.name}
+                      </h3>
+                      <p className="text-xs text-charcoal/70 leading-relaxed mb-4">
+                        {hall.description}
+                      </p>
+                      <ul className="space-y-1.5 text-xs text-charcoal/80 mb-6">
+                        {hall.features.map((f, i) => (
+                          <li key={i} className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--gold)]" />
+                            {f}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <Link
+                      to="/contact"
+                      className="block text-center w-full bg-[color:var(--forest)] text-ivory py-3 text-[10px] font-semibold tracking-widest uppercase hover:bg-[color:var(--gold)] hover:text-[color:var(--forest-deep)] transition-colors cursor-pointer"
+                    >
+                      Contact to Reserve Hall
+                    </Link>
                   </div>
                 </div>
-                <div className="md:w-1/2 p-6 md:p-8 flex flex-col justify-between">
-                  <div>
-                    <h3 className="font-serif text-2xl text-[color:var(--forest)] font-bold mb-2">
-                      {hall.name}
-                    </h3>
-                    <p className="text-xs text-charcoal/70 leading-relaxed mb-4">
-                      {hall.description}
-                    </p>
-                    <ul className="space-y-1.5 text-xs text-charcoal/80 mb-6">
-                      {hall.features.map((f, i) => (
-                        <li key={i} className="flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--gold)]" />
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <Link
-                    to="/contact"
-                    className="block text-center w-full bg-[color:var(--forest)] text-ivory py-3 text-[10px] font-semibold tracking-widest uppercase hover:bg-[color:var(--gold)] hover:text-[color:var(--forest-deep)] transition-colors cursor-pointer"
-                  >
-                    Contact to Reserve Hall
-                  </Link>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Occasions We Host */}
       <section className="py-24 px-6">

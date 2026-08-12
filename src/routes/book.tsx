@@ -16,7 +16,7 @@ import {
 import { SiteShell } from "@/components/site/SiteShell";
 import { BillInvoiceModal } from "@/components/site/BillInvoiceModal";
 import { PROPERTIES, ROOMS, type PropertyKey } from "@/lib/site-data";
-import { useBookingStore, PHYSICAL_ROOMS, type CreateBookingInput } from "@/lib/booking-store";
+import { useBookingStore, type CreateBookingInput } from "@/lib/booking-store";
 import {
   ADVANCE_AMOUNT_RUPEES,
   createAdvancePaymentOrder,
@@ -546,7 +546,7 @@ function BookPage() {
                           className={inp}
                         >
                           {availableRoomIds.map((id) => {
-                            const roomObj = rooms.find((r) => r.id === id) || PHYSICAL_ROOMS.find((r) => r.id === id);
+                            const roomObj = rooms.find((r) => r.id === id);
                             return (
                               <option key={id} value={id}>
                                 {roomObj ? `${roomObj.name}` : id}

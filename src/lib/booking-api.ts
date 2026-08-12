@@ -100,57 +100,13 @@ type SupabaseBookingRow = {
   created_at: string;
 };
 
-const PHYSICAL_ROOMS = [
-  {
-    id: "RM101",
-    name: "Room 101",
-    property: "mysore",
-    roomTypeSlug: "deluxe-room",
-    advanceAmount: 10,
-  },
-  {
-    id: "RM102",
-    name: "Room 102",
-    property: "mysore",
-    roomTypeSlug: "premium-suite",
-    advanceAmount: 10,
-  },
-  {
-    id: "RM103",
-    name: "Room 103",
-    property: "mysore",
-    roomTypeSlug: "family-villa",
-    advanceAmount: 10,
-  },
-  {
-    id: "RM104",
-    name: "Room 104",
-    property: "mysore",
-    roomTypeSlug: "deluxe-room",
-    advanceAmount: 10,
-  },
-  {
-    id: "RM201",
-    name: "Room 201",
-    property: "mahadevapura",
-    roomTypeSlug: "executive-room",
-    advanceAmount: 10,
-  },
-  {
-    id: "RM202",
-    name: "Room 202",
-    property: "mahadevapura",
-    roomTypeSlug: "premium-suite",
-    advanceAmount: 10,
-  },
-  {
-    id: "RM203",
-    name: "Room 203",
-    property: "mahadevapura",
-    roomTypeSlug: "executive-room",
-    advanceAmount: 10,
-  },
-] as const;
+const PHYSICAL_ROOMS: Array<{
+  id: string;
+  name: string;
+  property: string;
+  roomTypeSlug: string;
+  advanceAmount?: number;
+}> = [];
 
 // In-memory fallback only used when Supabase is unreachable
 const serverBookings: Booking[] = [];

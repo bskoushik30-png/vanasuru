@@ -38,14 +38,12 @@ function CreateEventPage() {
 
   const [title, setTitle] = useState("");
   const [property, setProperty] = useState(locations[0]?.key || "mysore");
-  const [venue, setVenue] = useState(FUNCTION_HALLS[0]?.name || "Heritage Gardens & Lawns");
+  const [venue, setVenue] = useState("");
   const [date, setDate] = useState("");
-  const [capacity, setCapacity] = useState("200");
-  const [price, setPrice] = useState("50000");
+  const [capacity, setCapacity] = useState("100");
+  const [price, setPrice] = useState("0");
   const [description, setDescription] = useState("");
-  const [image, setImage] = useState(
-    "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=75",
-  );
+  const [image, setImage] = useState("");
   const [isHighlighted, setIsHighlighted] = useState(true);
   const [imageFileName, setImageFileName] = useState("");
   const [submitted, setSubmitted] = useState(false);
