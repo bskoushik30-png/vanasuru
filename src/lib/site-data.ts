@@ -94,7 +94,7 @@ export const PROPERTIES: Record<PropertyKey, PropertyInfo> = {
     ],
     href: "/mahadevapura",
     mapEmbedUrl:
-      "https://www.google.com/maps/embed?pb=!1m17!1m12!1m3!1d3896.755266672102!2d76.7859033750668!3d12.39930998786595!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMTLCsDIzJzU3LjUiTiA3NsKwNDcnMTguNSJF!5e0!3m2!1sen!2sin!4v1785132548332!5m2!1sen!2sin",
+      "https://www.google.com/maps/embed?pb=!1m24!1m8!1m3!1d706.6303616637013!2d76.78922865630193!3d12.399374526194144!3m2!1i1024!2i768!4f13.1!4m13!3e2!4m5!1s0x3baf750acd75b241%3A0x9bd965e0df844a91!2sSudha%20Marigowda%20Convention%20Hall%2C%20Vadiyandahalli%2C%20Karnataka%20571415!3m2!1d12.3992534!2d76.7879521!4m5!1s0x3baf750acd75b241%3A0x9bd965e0df844a91!2sSudha%20Marigowda%20Convention%20Hall%2C%20Vadiyandahalli%2C%20Karnataka%20571415!3m2!1d12.3992534!2d76.7879521!5e1!3m2!1sen!2sin!4v1786554867831!5m2!1sen!2sin",
   },
 };
 
